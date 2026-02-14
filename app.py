@@ -225,6 +225,28 @@ def upload_to_drive(pdf_bytes, filename):
         st.error(f"Erreur Drive : {e}")
         return None
 
+import json
+
+# Préparation des données
+donnees_brouillon = {
+    "client": client_name,
+    "adresse": adresse,
+    "technicien": technicien,
+    "participants": st.session_state.participants,
+    "sections": [{"titre": s["titre"], "description": s["description"]} for s in st.session_state.sections]
+}
+
+# Conversion en texte
+json_string = json.dumps(donnees_brouillon, indent=4)
+
+st.sidebar.header("💾 Persistance locale")
+st.sidebar.download_button(
+    label="📥 Sauvegarder l'état actuel",
+    data=json_string,
+    file_name=f"brouillon_{client_name}.json",
+    mime="application/json",
+    help="Télécharge un petit fichier qui contient tout votre texte actuel."
+)
 # --- DANS VOTRE BOUTON DE GÉNÉRATION FINAL ---
 
 if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
@@ -249,33 +271,6 @@ if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
                 file_name=filename,
                 mime="application/pdf"
             )
-
-# --- BOUTON DE SAUVEGARDE LOCALE ---
-st.divider()
-st.subheader("💾 Sauvegarde sur cet appareil")
-
-# On vérifie si le PDF a déjà été généré pour éviter de le recalculer
-if 'pdf_bytes' in st.session_state:
-    st.download_button(
-        label="📥 Enregistrer le rapport (PC/Mobile)",
-        data=st.session_state.pdf_bytes,
-        file_name=f"Rapport_{client_name}_{date_visite}.pdf",
-        mime="application/pdf",
-        help="Cliquez ici pour choisir l'emplacement de sauvegarde sur votre appareil."
-    )
-    st.info("💡 Sur iPhone/Android, le fichier sera généralement enregistré dans l'application 'Fichiers' ou 'Téléchargements'.")
-
-if st.button("🚀 GÉNÉRER LE RAPPORT COMPLET"):
-    with st.spinner("Préparation du document..."):
-        # 1. Génération
-        pdf_data = generate_pdf()
-        # 2. On stocke dans la mémoire de la session
-        st.session_state.pdf_bytes = bytes(pdf_data)
-        
-        # 3. Envoi Drive (optionnel)
-        upload_to_drive(st.session_state.pdf_bytes, f"Rapport_{client_name}.pdf")
-        
-        st.success("✅ Rapport prêt !")
 
 import urllib.parse
 
