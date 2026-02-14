@@ -227,26 +227,7 @@ def upload_to_drive(pdf_bytes, filename):
 
 import json
 
-# Préparation des données
-donnees_brouillon = {
-    "client": client_name,
-    "adresse": adresse,
-    "technicien": technicien,
-    "participants": st.session_state.participants,
-    "sections": [{"titre": s["titre"], "description": s["description"]} for s in st.session_state.sections]
-}
 
-# Conversion en texte
-json_string = json.dumps(donnees_brouillon, indent=4)
-
-st.sidebar.header("💾 Persistance locale")
-st.sidebar.download_button(
-    label="📥 Sauvegarder l'état actuel",
-    data=json_string,
-    file_name=f"brouillon_{client_name}.json",
-    mime="application/json",
-    help="Télécharge un petit fichier qui contient tout votre texte actuel."
-)
 # --- DANS VOTRE BOUTON DE GÉNÉRATION FINAL ---
 
 if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
@@ -282,17 +263,24 @@ mail_link = f"mailto:?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quo
 
 st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; height:3em; background-color:#0078d4; color:white; border:none; border-radius:5px;">📧 Ouvrir dans Outlook</button></a>', unsafe_allow_html=True)
 
-st.sidebar.header("📂 Reprendre un travail")
-fichier_charge = st.sidebar.file_uploader("Charger un brouillon (.json)", type=["json"])
+# --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
+st.sidebar.title("💾 Gestion du Brouillon")
 
-if fichier_charge is not None:
-    # Lecture du fichier
-    contenu = json.load(fichier_charge)
-    
-    # Injection dans le session_state
-    st.session_state.client_name = contenu.get("client", "")
-    st.session_state.participants = contenu.get("participants", [])
-    st.session_state.sections = contenu.get("sections", [])
-    # ... ajoutez les autres champs ici
-    
-    st.sidebar.success("Données chargées ! Cliquez sur 'Rénitialiser' si besoin.")
+upload_brouillon = st.sidebar.file_uploader("Charger un fichier .json", type=["json"])
+
+if upload_brouillon:
+    try:
+        data = json.load(upload_brouillon)
+        
+        # On injecte les données dans le session_state
+        st.session_state.client_name = data.get("client_name", "")
+        st.session_state.adresse = data.get("adresse", "")
+        st.session_state.participants = data.get("participants", "")
+        st.session_state.sections = data.get("sections", [])
+        
+        st.sidebar.success("✅ Données chargées !")
+        # IMPORTANT : On force l'app à redémarrer pour afficher les données chargées
+        if st.sidebar.button("Appliquer les changements"):
+            st.rerun()
+    except Exception as e:
+        st.sidebar.error(f"Erreur de lecture : {e}")
