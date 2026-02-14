@@ -282,5 +282,81 @@ mail_link = f"mailto:?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quo
 
 st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; height:3em; background-color:#0078d4; color:white; border:none; border-radius:5px;">📧 Ouvrir dans Outlook</button></a>', unsafe_allow_html=True)
 
+
+#WORD DOCUMENT 
+
+from docx import Document
+from docx.shared import Inches, RGBColor, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+def generate_word():
+    doc = Document()
+    
+    # --- Titre Principal ---
+    title = doc.add_heading(f"RAPPORT : {st.session_state.client_name.upper()}", 0)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Au lieu de st.session_state.client_name.upper()
+nom_client = st.session_state.get('client_name', 'INCONNU').upper()
+title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
+
+    # --- En-tête Infos ---
+    p = doc.add_paragraph()
+    p.add_run(f"Date de la visite : ").bold = True
+    p.add_run(f"{date_visite}\n")
+    p.add_run(f"Technicien : ").bold = True
+    p.add_run(f"{technicien}\n")
+    p.add_run(f"Adresse : ").bold = True
+    p.add_run(f"{adresse}")
+
+    # --- Participants ---
+    doc.add_heading("Participants", level=1)
+    for part in st.session_state.participants:
+        doc.add_paragraph(f"• {part.get('nom', '')} ({part.get('societe', '')})", style='List Bullet')
+
+    
+    # --- Sections et Photos ---
+    doc.add_heading("Constats et Photos", level=1)
+    for s in st.session_state.sections:
+        # Titre de section en Bleu
+        h = doc.add_heading(s.get('titre', 'Sans titre'), level=2)
+        
+        # Description
+        doc.add_paragraph(s.get('description', ''))
+        
+        # Image (si présente)
+        if s.get('image') is not None:
+            # On doit convertir l'image Streamlit en flux compatible Word
+            image_stream = io.BytesIO(s['image'].getvalue())
+            doc.add_picture(image_stream, width=Inches(4.0))
+            doc.add_paragraph() # Espace après l'image
+
+    # Sauvegarde dans un buffer
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# --- SECTION EXPORT FINAL WORD  ---
+st.divider()
+st.subheader("🏁 Finaliser le Rapport")
+
+col_pdf, col_word = st.columns(2)
+
+with col_pdf:
+    if st.button("📄 Générer le PDF"):
+        pdf_content = generate_pdf()
+        st.download_button("⬇️ Télécharger PDF", data=pdf_content, file_name=f"Rapport_{client_name}.pdf")
+
+with col_word:
+    # On génère le Word directement au clic
+    word_buffer = generate_word()
+    st.download_button(
+        label="📝 Télécharger en Word (.docx)",
+        data=word_buffer,
+        file_name=f"Rapport_{client_name}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    
 # --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
 
