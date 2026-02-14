@@ -302,12 +302,12 @@ title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
 
     # --- En-tête Infos ---
 p = doc.add_paragraph()
-    p.add_run(f"Date de la visite : ").bold = True
-    p.add_run(f"{date_visite}\n")
-    p.add_run(f"Technicien : ").bold = True
-    p.add_run(f"{technicien}\n")
-    p.add_run(f"Adresse : ").bold = True
-    p.add_run(f"{adresse}")
+p.add_run(f"Date de la visite : ").bold = True
+p.add_run(f"{date_visite}\n")
+p.add_run(f"Technicien : ").bold = True
+p.add_run(f"{technicien}\n")
+p.add_run(f"Adresse : ").bold = True
+p.add_run(f"{adresse}")
 
     # --- Participants ---
     doc.add_heading("Participants", level=1)
