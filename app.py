@@ -335,7 +335,7 @@ for part in st.session_state.participants:
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return buffer
+return buffer
 
 # --- SECTION EXPORT FINAL WORD  ---
 st.divider()
