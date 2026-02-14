@@ -77,27 +77,31 @@ if st.button("➕ Ajouter une Section de travail"):
 
 # --- FONCTION DE GÉNÉRATION PDF ---
 def generate_pdf():
-    # 1. Initialisation (toujours utiliser 'P' pour Portrait, 'mm' pour millimètres, 'A4')
     pdf = FPDF()
     pdf.add_page()
+    # ... configuration police ...
 
-    # 2. CHARGEMENT DE LA POLICE (Vérifiez que le fichier .ttf est bien sur votre GitHub)
-    try:
-        # On télécharge une police Unicode (DejaVu est la plus fiable)
-        pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True)
-        pdf.set_font('DejaVu', '', 12)
-    except:
-        # Si le fichier est manquant, on utilise une police standard (mais risque d'erreur d'accents)
-        pdf.set_font('Arial', '', 12)
+    # On récupère les sections depuis le session_state
+    sections_a_imprimer = st.session_state.get('sections', [])
 
-    # ... reste du code ...
+    for sec in sections_a_imprimer:
+        # On s'assure que sec est bien un dictionnaire
+        if isinstance(sec, dict):
+            pdf.ln(10)
+            # Titre de la section
+            pdf.set_font('DejaVu', 'B', 14)
+            pdf.cell(0, 10, sec.get('titre', 'Sans titre'), ln=True)
+            
+            # Description de la section
+            pdf.set_font('DejaVu', '', 11)
+            # C'est ici que l'erreur arrivait si 'sec' était mal défini
+            description = sec.get('description', '')
+            pdf.multi_cell(0, 7, description)
+            
+            # Espace après chaque section
+            pdf.ln(5)
 
-    # 3. ÉCRITURE DES TEXTES
-    # Pour chaque cellule, FPDF utilisera maintenant "DejaVu" qui comprend les accents
-    pdf.multi_cell(0, 7, sec.get('description', ''))
-    
     return pdf.output(dest='S')
-
 
     # --- 2. EN-TÊTE AVEC LOGO ---
     # pdf.image(nom_du_fichier, x, y, largeur)
