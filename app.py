@@ -334,7 +334,7 @@ def generate_word():
         if image_data is not None:
             try:
                 # On convertit l'objet UploadedFile en flux binaire lisible par Word
-                image_bytes = image_data.getvalue()
+                image_bytes = s['image'].getvalue()
                 image_stream = io.BytesIO(image_bytes)
                 
                 # Ajout de l'image avec une largeur fixe (ex: 5 pouces)
