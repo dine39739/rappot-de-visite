@@ -78,30 +78,13 @@ if st.button("➕ Ajouter une Section de travail"):
 # --- FONCTION DE GÉNÉRATION PDF ---
 def generate_pdf():
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    # ... configuration police ...
-
-    # On récupère les sections depuis le session_state
-    sections_a_imprimer = st.session_state.get('sections', [])
-
-    for sec in sections_a_imprimer:
-        # On s'assure que sec est bien un dictionnaire
-        if isinstance(sec, dict):
-            pdf.ln(10)
-            # Titre de la section
-            pdf.set_font("DejaVu", '', 14)
-            pdf.cell(0, 10, sec.get('titre', 'Sans titre'), ln=True)
-            
-            # Description de la section
-            pdf.set_font("DejaVu", '', 11)
-            # C'est ici que l'erreur arrivait si 'sec' était mal défini
-            description = sec.get('description', '')
-            pdf.multi_cell(0, 7, description)
-            
-            # Espace après chaque section
-            pdf.ln(5)
-
-    return pdf.output(dest='S')
+    
+    # --- 1. CHARGEMENT DE LA POLICE UNICODE ---
+    # Assurez-vous que le fichier .ttf est bien sur votre GitHub
+    pdf.add_font("DejaVu", '', 'DejaVuSans.ttf')
+    pdf.set_font("DejaVu", '', 12)
 
     # --- 2. EN-TÊTE AVEC LOGO ---
     # pdf.image(nom_du_fichier, x, y, largeur)
@@ -141,6 +124,7 @@ def generate_pdf():
         for p in st.session_state.participants:
             pdf.cell(0, 8, f"• {p['nom']} (Tél: {p['tel']} | Email: {p['email']})", ln=True)
         pdf.ln(10)
+
 
     # --- 6. CORPS DU RAPPORT ---
     for sec in st.session_state.sections:
