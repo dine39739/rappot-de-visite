@@ -356,7 +356,7 @@ def generate_word():
 st.divider()
 st.subheader("🏁 Finaliser le Rapport")
 
-col_word = st.columns(1)
+col_word = st.columns(2)
 
 with col_word:
     # On ne génère le document QUE si l'utilisateur clique sur le bouton
