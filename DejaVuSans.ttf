@@ -1,7 +1,7 @@
 def generate_pdf():
     pdf = FPDF()
-    # 1. Ajouter une police qui gère l'Unicode
-    # pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True) 
-    # pdf.set_font('DejaVu', '', 12)
+    1. Ajouter une police qui gère l'Unicode
+    pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True) 
+    pdf.set_font('DejaVu', '', 12)
     
     # ... le reste du code
