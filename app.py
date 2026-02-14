@@ -249,6 +249,22 @@ if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
                 file_name=filename,
                 mime="application/pdf"
             )
+
+# --- BOUTON DE SAUVEGARDE LOCALE ---
+st.divider()
+st.subheader("💾 Sauvegarde sur cet appareil")
+
+# On vérifie si le PDF a déjà été généré pour éviter de le recalculer
+if 'pdf_bytes' in st.session_state:
+    st.download_button(
+        label="📥 Enregistrer le rapport (PC/Mobile)",
+        data=st.session_state.pdf_bytes,
+        file_name=f"Rapport_{client_name}_{date_visite}.pdf",
+        mime="application/pdf",
+        help="Cliquez ici pour choisir l'emplacement de sauvegarde sur votre appareil."
+    )
+    st.info("💡 Sur iPhone/Android, le fichier sera généralement enregistré dans l'application 'Fichiers' ou 'Téléchargements'.")
+    
 import urllib.parse
 
 # Préparation du lien mailto
