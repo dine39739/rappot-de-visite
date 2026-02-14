@@ -264,7 +264,19 @@ if 'pdf_bytes' in st.session_state:
         help="Cliquez ici pour choisir l'emplacement de sauvegarde sur votre appareil."
     )
     st.info("💡 Sur iPhone/Android, le fichier sera généralement enregistré dans l'application 'Fichiers' ou 'Téléchargements'.")
-    
+
+if st.button("🚀 GÉNÉRER LE RAPPORT COMPLET"):
+    with st.spinner("Préparation du document..."):
+        # 1. Génération
+        pdf_data = generate_pdf()
+        # 2. On stocke dans la mémoire de la session
+        st.session_state.pdf_bytes = bytes(pdf_data)
+        
+        # 3. Envoi Drive (optionnel)
+        upload_to_drive(st.session_state.pdf_bytes, f"Rapport_{client_name}.pdf")
+        
+        st.success("✅ Rapport prêt !")
+
 import urllib.parse
 
 # Préparation du lien mailto
