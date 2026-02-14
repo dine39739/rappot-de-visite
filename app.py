@@ -283,15 +283,7 @@ mail_link = f"mailto:?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quo
 st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; height:3em; background-color:#0078d4; color:white; border:none; border-radius:5px;">📧 Ouvrir dans Outlook</button></a>', unsafe_allow_html=True)
 
 # --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
-st.sidebar.title("💾 Gestion du Brouillon")
-
-upload_brouillon = st.sidebar.file_uploader("Charger un fichier .json", type=["json"])
-
-if upload_brouillon:
-    try:
-        data = json.load(upload_brouillon)
-        
-       import streamlit as st
+import streamlit as st
 import json
 
 # --- 1. INITIALISATION DES VALEURS PAR DÉFAUT ---
@@ -335,3 +327,27 @@ with col2:
     technicien = st.text_input("Technicien", value=st.session_state.technicien)
 
 st.session_state.participants = st.text_area("Participants", value=st.session_state.participants)
+# --- GESTION DES PARTICIPANTS ---
+st.subheader("👥 Participants")
+
+# On s'assure que participants est une liste de dictionnaires
+if not isinstance(st.session_state.participants, list):
+    st.session_state.participants = []
+
+for i, p in enumerate(st.session_state.participants):
+    c1, c2 = st.columns(2)
+    
+    # Sécurité : on vérifie que 'nom' et 'societe' existent
+    nom_actuel = p.get('nom', "") if isinstance(p, dict) else ""
+    soc_actuel = p.get('societe', "") if isinstance(p, dict) else ""
+    
+    # Mise à jour des valeurs avec les nouveaux inputs
+    new_nom = c1.text_input(f"Nom & Prénom {i+1}", value=nom_actuel, key=f"p_nom_{i}")
+    new_soc = c2.text_input(f"Société {i+1}", value=soc_actuel, key=f"p_soc_{i}")
+    
+    # On réenregistre proprement
+    st.session_state.participants[i] = {"nom": new_nom, "societe": new_soc}
+
+if st.button("➕ Ajouter un participant"):
+    st.session_state.participants.append({"nom": "", "societe": ""})
+    st.rerun()
