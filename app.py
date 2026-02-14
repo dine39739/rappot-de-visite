@@ -359,11 +359,14 @@ st.subheader("🏁 Finaliser le Rapport")
 col_word = st.columns(1)
 
 with col_word:
-    # On génère le Word directement au clic
-    word_buffer = generate_word()
-    st.download_button(
-        label="📝 Télécharger en Word (.docx)",
-        data=word_buffer,
-        file_name=f"Rapport_{client_name}.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+    # On ne génère le document QUE si l'utilisateur clique sur le bouton
+    # Cela évite de calculer le Word à chaque fois que vous tapez une lettre
+    if st.button("📝 Préparer le fichier Word"):
+        word_buffer = generate_word() # L'appel est maintenant protégé ici
+        
+        st.download_button(
+            label="⬇️ Télécharger le Word (.docx)",
+            data=word_buffer,
+            file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
