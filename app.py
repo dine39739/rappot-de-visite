@@ -193,7 +193,7 @@ from googleapiclient.http import MediaIoBaseUpload
 
 # --- CONFIGURATION DRIVE ---
 # Remplacez par l'ID de votre dossier Drive (il est dans l'URL de votre dossier)
-FOLDER_ID = "VOTRE_ID_DE_DOSSIER_ICI" 
+FOLDER_ID = "1izwpTbS9x5fUI2a0UWQVWmlG3XcKNEDn" 
 
 def upload_to_drive(pdf_bytes, filename):
     try:
