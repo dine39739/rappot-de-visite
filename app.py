@@ -310,9 +310,9 @@ p.add_run(f"Adresse : ").bold = True
 p.add_run(f"{adresse}")
 
     # --- Participants ---
-    doc.add_heading("Participants", level=1)
-    for part in st.session_state.participants:
-        doc.add_paragraph(f"• {part.get('nom', '')} ({part.get('societe', '')})", style='List Bullet')
+doc.add_heading("Participants", level=1)
+for part in st.session_state.participants:
+    doc.add_paragraph(f"• {part.get('nom', '')} ({part.get('societe', '')})", style='List Bullet')
 
     
     # --- Sections et Photos ---
