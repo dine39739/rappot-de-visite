@@ -197,23 +197,29 @@ FOLDER_ID = "1izwpTbS9x5fUI2a0UWQVWmlG3XcKNEDn"
 
 def upload_to_drive(pdf_bytes, filename):
     try:
-        # 1. Récupération des secrets
         info = st.secrets["gcp_service_account"]
         creds = service_account.Credentials.from_service_account_info(info)
         service = build('drive', 'v3', credentials=creds)
 
-        # 2. Configuration du fichier
+        # Configuration du fichier
         file_metadata = {
             'name': filename,
             'parents': [FOLDER_ID]
         }
         
-        # 3. Préparation du flux de données
         fh = io.BytesIO(pdf_bytes)
         media = MediaIoBaseUpload(fh, mimetype='application/pdf')
 
-        # 4. Envoi
-        file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        # L'ASTUCE : On force le fichier à ne pas utiliser le quota du robot
+        # En partageant le dossier avec le robot en tant qu'éditeur, 
+        # le fichier hérite de la propriété du dossier parent (le vôtre).
+        file = service.files().create(
+            body=file_metadata, 
+            media_body=media, 
+            fields='id',
+            supportsAllDrives=True # Important pour la gestion des quotas
+        ).execute()
+        
         return file.get('id')
     except Exception as e:
         st.error(f"Erreur Drive : {e}")
