@@ -281,3 +281,18 @@ corps = f"Bonjour,\n\nVeuillez trouver ci-joint le rapport pour l'intervention d
 mail_link = f"mailto:?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps)}"
 
 st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; height:3em; background-color:#0078d4; color:white; border:none; border-radius:5px;">📧 Ouvrir dans Outlook</button></a>', unsafe_allow_html=True)
+
+st.sidebar.header("📂 Reprendre un travail")
+fichier_charge = st.sidebar.file_uploader("Charger un brouillon (.json)", type=["json"])
+
+if fichier_charge is not None:
+    # Lecture du fichier
+    contenu = json.load(fichier_charge)
+    
+    # Injection dans le session_state
+    st.session_state.client_name = contenu.get("client", "")
+    st.session_state.participants = contenu.get("participants", [])
+    st.session_state.sections = contenu.get("sections", [])
+    # ... ajoutez les autres champs ici
+    
+    st.sidebar.success("Données chargées ! Cliquez sur 'Rénitialiser' si besoin.")
