@@ -358,6 +358,11 @@ def generate_word():
                 p_err = doc.add_paragraph()
                 p_err.add_run(f"[Image non insérée : {e}]").italic = True
 
+buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer # <--- VÉRIFIEZ QUE CETTE LIGNE EXISTE ET EST BIEN ALIGNÉE
+
 # --- SECTION EXPORT FINAL (INTERFACE) ---
 st.divider()
 st.subheader("🏁 Finaliser le Rapport")
