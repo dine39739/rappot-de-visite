@@ -94,8 +94,11 @@ def generate_pdf():
     pdf.set_fill_color(0, 51, 102)  # Couleur du fond de l'encadré
     pdf.set_text_color(255, 255, 255) # Couleur du texte
     pdf.set_font("helvetica", '', 18)
-    
+  
+    # Cell(largeur, hauteur, texte, bordure, retour ligne, alignement, remplissage)
+    pdf.cell(0, 15, "RAPPORT D'INTERVENTION TECHNIQUE", ln=True, align='C', fill=True)
     # Header
+    
     pdf.set_font("helvetica", 'B', 20)
     pdf.cell(0, 15, "RAPPORT D'INTERVENTION", ln=True, align='C')
     pdf.set_font("helvetica", '', 12)
