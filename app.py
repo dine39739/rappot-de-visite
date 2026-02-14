@@ -356,12 +356,7 @@ def generate_word():
 st.divider()
 st.subheader("🏁 Finaliser le Rapport")
 
-col_pdf, col_word = st.columns(2)
-
-with col_pdf:
-    if st.button("📄 Générer le PDF"):
-        pdf_content = generate_pdf()
-        st.download_button("⬇️ Télécharger PDF", data=pdf_content, file_name=f"Rapport_{client_name}.pdf")
+col_word = st.columns(2)
 
 with col_word:
     # On génère le Word directement au clic
