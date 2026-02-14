@@ -291,15 +291,47 @@ if upload_brouillon:
     try:
         data = json.load(upload_brouillon)
         
-        # On injecte les données dans le session_state
-        st.session_state.client_name = data.get("client_name", "")
-        st.session_state.adresse = data.get("adresse", "")
-        st.session_state.participants = data.get("participants", "")
-        st.session_state.sections = data.get("sections", [])
-        
-        st.sidebar.success("✅ Données chargées !")
-        # IMPORTANT : On force l'app à redémarrer pour afficher les données chargées
-        if st.sidebar.button("Appliquer les changements"):
-            st.rerun()
-    except Exception as e:
-        st.sidebar.error(f"Erreur de lecture : {e}")
+       import streamlit as st
+import json
+
+# --- 1. INITIALISATION DES VALEURS PAR DÉFAUT ---
+# On s'assure que ces clés existent dans la mémoire AVANT de dessiner l'interface
+champs = ['client_name', 'adresse', 'technicien', 'participants']
+for champ in champs:
+    if champ not in st.session_state:
+        st.session_state[champ] = ""
+
+if 'sections' not in st.session_state or len(st.session_state.sections) == 0:
+    st.session_state.sections = [{"titre": "", "description": "", "image": None}]
+
+# --- 2. LOGIQUE D'IMPORTATION ---
+st.sidebar.title("💾 Gestion du Brouillon")
+upload_brouillon = st.sidebar.file_uploader("Charger un fichier .json", type=["json"])
+
+if upload_brouillon:
+    data = json.load(upload_brouillon)
+    # On force l'injection dans le session_state
+    st.session_state.client_name = data.get("client_name", "")
+    st.session_state.adresse = data.get("adresse", "")
+    st.session_state.technicien = data.get("technicien", "")
+    st.session_state.participants = data.get("participants", "")
+    st.session_state.sections = data.get("sections", [])
+    
+    st.sidebar.success("✅ Données chargées !")
+    # Le bouton Rerun est indispensable ici pour rafraîchir les champs
+    if st.sidebar.button("Afficher les données"):
+        st.rerun()
+
+# --- 3. AFFICHAGE DES CHAMPS ---
+st.title("📋 Rapport de Visite Technique")
+
+col1, col2 = st.columns(2)
+with col1:
+    # IMPORTANT : l'argument 'value' doit pointer vers le session_state
+    client_name = st.text_input("Nom du Client", value=st.session_state.client_name)
+    adresse = st.text_input("Adresse de la visite", value=st.session_state.adresse)
+with col2:
+    date_visite = st.date_input("Date")
+    technicien = st.text_input("Technicien", value=st.session_state.technicien)
+
+st.session_state.participants = st.text_area("Participants", value=st.session_state.participants)
