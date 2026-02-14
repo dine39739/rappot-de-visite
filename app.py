@@ -4,6 +4,7 @@ from fpdf import FPDF
 from PIL import Image
 import os
 import io
+from docx import Document
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
