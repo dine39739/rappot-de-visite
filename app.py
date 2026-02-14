@@ -376,12 +376,15 @@ with col_pdf:
         )
 
 with col_word:
-    # On ne génère le buffer QUE si on clique sur le bouton
-    if st.button("📝 Préparer le Word"):
-        word_data = generate_word()
+    # 1. On crée le bouton déclencheur
+    if st.button("📝 Préparer le fichier Word"):
+        # 2. On génère le document (le buffer io.BytesIO)
+        word_buffer = generate_word() 
+        
+        # 3. On affiche le vrai bouton de téléchargement une fois le buffer prêt
         st.download_button(
-            label="⬇️ Télécharger Word (.docx)",
-            data=word_data,
+            label="⬇️ Cliquer pour télécharger (.docx)",
+            data=word_buffer, # On passe le buffer io.BytesIO directement ici
             file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
