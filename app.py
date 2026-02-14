@@ -80,6 +80,20 @@ def generate_pdf():
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+
+    # --- 2. EN-TÊTE AVEC LOGO ---
+    # pdf.image(nom_du_fichier, x, y, largeur)
+    # Si le fichier logo.png existe, on l'affiche
+    if os.path.exists("logo.png"):
+        pdf.image("logo.png", x=10, y=8, w=30)
+    
+    pdf.ln(20) # Saut de ligne après le logo
+
+    # --- 3. TITRE ENCADRÉ (Bleu foncé, texte blanc) ---
+    # Couleurs RGB : Bleu foncé (0, 51, 102), Blanc (255, 255, 255)
+    pdf.set_fill_color(0, 51, 102)  # Couleur du fond de l'encadré
+    pdf.set_text_color(255, 255, 255) # Couleur du texte
+    pdf.set_font('DejaVu', '', 18)
     
     # Header
     pdf.set_font("helvetica", 'B', 20)
