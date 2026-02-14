@@ -291,7 +291,6 @@ def generate_word():
     doc = Document()
     
     # 1. Récupération sécurisée des variables
-    # On utilise .get() pour éviter que l'app crash si un champ est vide
     nom_client = st.session_state.get('client_name', 'Client Inconnu').upper()
     nom_tech = st.session_state.get('technicien', 'Non renseigné')
     visite_date = str(st.session_state.get('date_visite', ''))
@@ -312,7 +311,6 @@ def generate_word():
 
     # 4. Participants
     doc.add_heading("Participants", level=1)
-    # On vérifie que participants est bien une liste avant de boucler
     parts = st.session_state.get('participants', [])
     if isinstance(parts, list):
         for part in parts:
@@ -322,55 +320,37 @@ def generate_word():
                 doc.add_paragraph(f"• {nom_p} ({soc_p})", style='List Bullet')
 
     # 5. Sections et Photos
-   # --- Sections et Photos ---
     doc.add_heading("Constats et Photos", level=1)
-    
-    # On récupère la liste des sections
     sections = st.session_state.get('sections', [])
     
     for s in sections:
-        # 1. Ajout du titre de la section
-        titre_section = s.get('titre', 'Sans titre')
-        doc.add_heading(titre_section, level=2)
+        doc.add_heading(s.get('titre', 'Sans titre'), level=2)
+        doc.add_paragraph(s.get('description', ''))
         
-        # 2. Ajout de la description
-        description_text = s.get('description', '')
-        doc.add_paragraph(description_text)
-        
-        # 3. Gestion de l'image (C'est ici que la magie opère)
         if s.get('image') is not None:
             try:
-                # EXTRACTION : On récupère les octets de l'image
                 image_bytes = s['image'].getvalue()
-                
-                # CONVERSION : On crée un flux lisible par Word
                 image_stream = io.BytesIO(image_bytes)
-                
-                # INSERTION : On place l'image dans le document
-                # width=Inches(4.0) permet de garder une taille raisonnable
                 doc.add_picture(image_stream, width=Inches(4.0))
-                
-                # ESPACEMENT : On ajoute un paragraphe vide pour ne pas coller le texte suivant
                 doc.add_paragraph() 
-                
             except Exception as e:
-                # En cas de problème avec une image, on l'indique dans le Word sans bloquer le reste
                 p_err = doc.add_paragraph()
                 p_err.add_run(f"[Image non insérée : {e}]").italic = True
 
-buffer = io.BytesIO()
+    # --- ATTENTION : CES LIGNES DOIVENT ÊTRE DÉCALÉES DE 4 ESPACES ---
+    buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return buffer # <--- VÉRIFIEZ QUE CETTE LIGNE EXISTE ET EST BIEN ALIGNÉE
+    return buffer 
 
 # --- SECTION EXPORT FINAL (INTERFACE) ---
+# Ici on revient tout à gauche car on sort de la fonction
 st.divider()
 st.subheader("🏁 Finaliser le Rapport")
 
 col_pdf, col_word = st.columns(2)
 
 with col_pdf:
-    # On utilise une clé unique pour le bouton
     if st.button("📄 Préparer le PDF"):
         pdf_content = generate_pdf()
         st.download_button(
@@ -382,19 +362,15 @@ with col_pdf:
 
 with col_word:
     if st.button("📝 Préparer le fichier Word"):
-        # 1. On génère le buffer (l'objet mémoire)
         word_buffer = generate_word() 
-        
-        # 2. On extrait les DONNÉES réelles du buffer avec .getvalue()
-        word_data = word_buffer.getvalue() 
-        
-        # 3. On donne word_data (les octets) au bouton
-        st.download_button(
-            label="⬇️ Cliquer pour télécharger (.docx)",
-            data=word_data,  # <--- C'est ici que le changement est crucial
-            file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        if word_buffer:
+            word_data = word_buffer.getvalue() 
+            st.download_button(
+                label="⬇️ Cliquer pour télécharger (.docx)",
+                data=word_data,
+                file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
     
 # --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
 
