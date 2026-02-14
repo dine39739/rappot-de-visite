@@ -267,6 +267,30 @@ st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; h
 st.sidebar.title("💾 Gestion du Brouillon")
 st.sidebar.info("Sauvegardez votre saisie pour la reprendre plus tard sans rien perdre.")
 
+#ENREGISTRER EN BROUILLON 
+import json
+
+# Préparation des données
+donnees_brouillon = {
+    "client": client_name,
+    "adresse": adresse,
+    "technicien": technicien,
+    "participants": st.session_state.participants,
+    "sections": [{"titre": s["titre"], "description": s["description"]} for s in st.session_state.sections]
+}
+
+# Conversion en texte
+json_string = json.dumps(donnees_brouillon, indent=4)
+
+st.sidebar.header("💾 Persistance locale")
+st.sidebar.download_button(
+    label="📥 Sauvegarder l'état actuel",
+    data=json_string,
+    file_name=f"brouillon_{client_name}.json",
+    mime="application/json",
+    help="Télécharge un petit fichier qui contient tout votre texte actuel."
+)
+
 upload_brouillon = st.sidebar.file_uploader("Charger un fichier .json", type=["json"])
 
 if upload_brouillon:
