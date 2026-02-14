@@ -89,11 +89,11 @@ def generate_pdf():
         if isinstance(sec, dict):
             pdf.ln(10)
             # Titre de la section
-            pdf.set_font('DejaVu', '', 14)
+            pdf.set_font("DejaVu"', '', 14)
             pdf.cell(0, 10, sec.get('titre', 'Sans titre'), ln=True)
             
             # Description de la section
-            pdf.set_font('DejaVu', '', 11)
+            pdf.set_font("DejaVu", '', 11)
             # C'est ici que l'erreur arrivait si 'sec' était mal défini
             description = sec.get('description', '')
             pdf.multi_cell(0, 7, description)
