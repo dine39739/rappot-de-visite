@@ -323,21 +323,29 @@ def generate_word():
 
     # 5. Sections et Photos
     doc.add_heading("Constats et Photos", level=1)
+    
     sections = st.session_state.get('sections', [])
     for s in sections:
-        # Titre de section
         doc.add_heading(s.get('titre', 'Sans titre'), level=2)
-        # Description
         doc.add_paragraph(s.get('description', ''))
-        # Image (si présente et si elle a un attribut getvalue)
-        if s.get('image') is not None:
+        
+        # Vérification de l'image
+        image_data = s.get('image')
+        if image_data is not None:
             try:
-                image_stream = io.BytesIO(s['image'].getvalue())
-                doc.add_picture(image_stream, width=Inches(4.0))
+                # On convertit l'objet UploadedFile en flux binaire lisible par Word
+                image_bytes = image_data.getvalue()
+                image_stream = io.BytesIO(image_bytes)
+                
+                # Ajout de l'image avec une largeur fixe (ex: 5 pouces)
+                doc.add_picture(image_stream, width=Inches(5.0))
+                
+                # Petit espace de courtoisie après l'image
                 doc.add_paragraph() 
-            except:
-                doc.add_paragraph("[Image non disponible]")
+            except Exception as e:
+                doc.add_paragraph(f"[Erreur lors de l'insertion de l'image : {e}]")
 
+    
     # 6. Sauvegarde dans le buffer
     buffer = io.BytesIO()
     doc.save(buffer)
