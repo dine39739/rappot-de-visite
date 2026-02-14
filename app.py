@@ -125,7 +125,6 @@ def generate_pdf():
             pdf.cell(0, 8, f"• {p['nom']} (Tél: {p['tel']} | Email: {p['email']})", ln=True)
         pdf.ln(10)
 
-
     # --- 6. CORPS DU RAPPORT ---
     for sec in st.session_state.sections:
         if sec['titre']:
@@ -297,77 +296,3 @@ if fichier_charge is not None:
     # ... ajoutez les autres champs ici
     
     st.sidebar.success("Données chargées ! Cliquez sur 'Rénitialiser' si besoin.")
-
-# RAPPORT EN WORD 
-    # partie implantation Word 
-
-from docx import Document
-from docx.shared import Inches, RGBColor, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-
-def generate_word():
-    doc = Document() # 4 espaces ici
-    
-    # --- Titre Principal ---
-    nom_client = st.session_state.get('client_name', 'INCONNU').upper()
-    title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    # --- En-tête Infos ---
-    p = doc.add_paragraph() # <--- Vérifiez bien l'alignement ici !
-    p.add_run(f"Date de la visite : ").bold = True
-    p.add_run(f"{st.session_state.get('date_visite', '')}\n")
-    p.add_run(f"Technicien : ").bold = True
-    p.add_run(f"{st.session_state.get('technicien', '')}\n")
-    p.add_run(f"Adresse : ").bold = True
-    p.add_run(f"{st.session_state.get('adresse', '')}")
-    
-
-
-    # --- Participants ---
-    doc.add_heading("Participants", level=1)
-    for part in st.session_state.participants:
-        doc.add_paragraph(f"• {part.get('nom', '')} ({part.get('societe', '')})", style='List Bullet')
-
-    # --- Sections et Photos ---
-    doc.add_heading("Constats et Photos", level=1)
-    for s in st.session_state.sections:
-        # Titre de section en Bleu
-        h = doc.add_heading(s.get('titre', 'Sans titre'), level=2)
-        
-        # Description
-        doc.add_paragraph(s.get('description', ''))
-        
-        # Image (si présente)
-        if s.get('image') is not None:
-            # On doit convertir l'image Streamlit en flux compatible Word
-            image_stream = io.BytesIO(s['image'].getvalue())
-            doc.add_picture(image_stream, width=Inches(4.0))
-            doc.add_paragraph() # Espace après l'image
-
-    # Sauvegarde dans un buffer
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
-
-#partie ajout bouton télécharger le Word
-
-# --- SECTION EXPORT FINAL ---
-st.divider()
-st.subheader("🏁 Finaliser le Rapport")
-
-col_pdf, col_word = st.columns(2)
-
-with col_word:
-    # On ne génère le document QUE si l'utilisateur clique sur le bouton
-    # Cela évite de calculer le Word à chaque fois que vous tapez une lettre
-    if st.button("📝 Préparer le fichier Word"):
-        word_buffer = generate_word() # L'appel est maintenant protégé ici
-        
-        st.download_button(
-            label="⬇️ Télécharger le Word (.docx)",
-            data=word_buffer,
-            file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
