@@ -80,6 +80,11 @@ def generate_pdf():
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+    
+    # --- 1. CHARGEMENT DE LA POLICE UNICODE ---
+    # Assurez-vous que le fichier .ttf est bien sur votre GitHub
+    pdf.add_font("helvetica", '', 'DejaVuSans.ttf')
+    pdf.set_font("helvetica", '', 12)
 
     # --- 2. EN-TÊTE AVEC LOGO ---
     # pdf.image(nom_du_fichier, x, y, largeur)
@@ -94,61 +99,72 @@ def generate_pdf():
     pdf.set_fill_color(0, 51, 102)  # Couleur du fond de l'encadré
     pdf.set_text_color(255, 255, 255) # Couleur du texte
     pdf.set_font("helvetica", '', 18)
-  
+    
     # Cell(largeur, hauteur, texte, bordure, retour ligne, alignement, remplissage)
     pdf.cell(0, 15, "RAPPORT D'INTERVENTION TECHNIQUE", ln=True, align='C', fill=True)
-    # Header
     
-    pdf.set_font("helvetica", 'B', 20)
-    pdf.cell(0, 15, "RAPPORT D'INTERVENTION", ln=True, align='C')
-    pdf.set_font("helvetica", '', 12)
-    pdf.cell(0, 10, f"Projet : {client_name}", ln=True, align='C')
-    pdf.cell(0, 10, f"Date : {date_visite} | Technicien : {technicien}", ln=True, align='C')
+    # --- 4. RÉINITIALISATION POUR LE RESTE DU TEXTE ---
+    pdf.set_text_color(0, 0, 0) # On repasse en noir
+    pdf.set_font("helvetica", '', 11)
+    pdf.ln(5)
+    
+    # Infos générales (sous le titre)
+    pdf.set_font("helvetica", '', 10)
+    pdf.cell(0, 7, f"Client : {client_name}", ln=True)
+    pdf.cell(0, 7, f"Adresse : {adresse}", ln=True)
+    pdf.cell(0, 7, f"Date : {date_visite} | Technicien : {technicien}", ln=True)
     pdf.ln(10)
 
-    # Participants
+    # --- 5. SECTION PARTICIPANTS ---
     if st.session_state.participants:
-        pdf.set_fill_color(240, 240, 240)
-        pdf.set_font("helvetica", 'B', 12)
-        pdf.cell(0, 10, " LISTE DES PERSONNES PRÉSENTES", ln=True, fill=True)
-        pdf.set_font("helvetica", size=10)
+        pdf.set_font("helvetica", '', 12)
+        pdf.set_fill_color(230, 230, 230) # Gris très clair
+        pdf.cell(0, 10, " PERSONNES PRÉSENTES", ln=True, fill=True)
+        pdf.set_font("helvetica", '', 10)
         for p in st.session_state.participants:
-            pdf.cell(0, 8, f"• {p['nom']} - Tel: {p['tel']} - Email: {p['email']}", ln=True)
+            pdf.cell(0, 8, f"• {p['nom']} (Tél: {p['tel']} | Email: {p['email']})", ln=True)
         pdf.ln(10)
 
-    # Contenu
+    # --- 6. CORPS DU RAPPORT ---
     for sec in st.session_state.sections:
         if sec['titre']:
-            pdf.set_font("helvetica", 'B', 14)
+            # Titre de section stylisé (souligné bleu)
+            pdf.set_font("helvetica", '', 14)
             pdf.set_text_color(0, 51, 102)
             pdf.cell(0, 10, sec['titre'].upper(), ln=True)
+            pdf.set_draw_color(0, 51, 102)
+            pdf.line(pdf.get_x(), pdf.get_y(), pdf.get_x() + 190, pdf.get_y())
+            pdf.ln(2)
+            
+            # Description
             pdf.set_text_color(0, 0, 0)
-            pdf.set_font("helvetica", size=11)
+            pdf.set_font("helvetica", '', 11)
             pdf.multi_cell(0, 7, sec['description'])
             pdf.ln(5)
 
-            # Photos de la section
+            # Photos
             if sec['photos']:
-                for img_file in sec['photos']:
+                # On organise les photos par 2 par ligne pour gagner de la place
+                col_width = 90
+                for i, img_file in enumerate(sec['photos']):
                     try:
                         img = Image.open(img_file)
                         if img.mode in ("RGBA", "P"):
                             img = img.convert("RGB")
                         
-                        # Sauvegarde temporaire propre
-                        temp_path = f"temp_img_{img_file.name}"
+                        temp_path = f"temp_{idx}_{i}_{img_file.name}"
                         img.save(temp_path)
                         
-                        # On vérifie la place restante sur la page
-                        if pdf.get_y() > 200: 
+                        # Gestion de l'espace pour ne pas couper l'image en bas de page
+                        if pdf.get_y() > 220:
                             pdf.add_page()
-                            
-                        pdf.image(temp_path, w=90) # Largeur 90mm
+                        
+                        pdf.image(temp_path, w=col_width)
                         pdf.ln(5)
                         os.remove(temp_path)
                     except Exception as e:
-                        st.error(f"Erreur image : {e}")
-            pdf.ln(5)
+                        st.error(f"Erreur photo : {e}")
+            pdf.ln(10)
 
     return pdf.output()
 
