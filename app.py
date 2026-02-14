@@ -77,14 +77,27 @@ if st.button("➕ Ajouter une Section de travail"):
 
 # --- FONCTION DE GÉNÉRATION PDF ---
 def generate_pdf():
+    # 1. Initialisation (toujours utiliser 'P' pour Portrait, 'mm' pour millimètres, 'A4')
     pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+
+    # 2. CHARGEMENT DE LA POLICE (Vérifiez que le fichier .ttf est bien sur votre GitHub)
+    try:
+        # On télécharge une police Unicode (DejaVu est la plus fiable)
+        pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True)
+        pdf.set_font('DejaVu', '', 12)
+    except:
+        # Si le fichier est manquant, on utilise une police standard (mais risque d'erreur d'accents)
+        pdf.set_font('Arial', '', 12)
+
+    # ... reste du code ...
+
+    # 3. ÉCRITURE DES TEXTES
+    # Pour chaque cellule, FPDF utilisera maintenant "DejaVu" qui comprend les accents
+    pdf.multi_cell(0, 7, sec.get('description', ''))
     
-    # --- 1. CHARGEMENT DE LA POLICE UNICODE ---
-    # Assurez-vous que le fichier .ttf est bien sur votre GitHub
-    pdf.add_font("DejaVu", '', 'DejaVuSans.ttf')
-    pdf.set_font("DejaVu", '', 12)
+    return pdf.output(dest='S')
+
 
     # --- 2. EN-TÊTE AVEC LOGO ---
     # pdf.image(nom_du_fichier, x, y, largeur)
