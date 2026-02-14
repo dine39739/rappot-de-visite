@@ -249,3 +249,12 @@ if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
                 file_name=filename,
                 mime="application/pdf"
             )
+import urllib.parse
+
+# Préparation du lien mailto
+sujet = f"Rapport d'intervention : {client_name}"
+corps = f"Bonjour,\n\nVeuillez trouver ci-joint le rapport pour l'intervention du {date_visite}.\n\nCordialement,"
+# Encodage pour les espaces et caractères spéciaux
+mail_link = f"mailto:?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps)}"
+
+st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; height:3em; background-color:#0078d4; color:white; border:none; border-radius:5px;">📧 Ouvrir dans Outlook</button></a>', unsafe_allow_html=True)
