@@ -283,80 +283,91 @@ mail_link = f"mailto:?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quo
 st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; height:3em; background-color:#0078d4; color:white; border:none; border-radius:5px;">📧 Ouvrir dans Outlook</button></a>', unsafe_allow_html=True)
 
 
-#WORD DOCUMENT 
-
-from docx import Document
-from docx.shared import Inches, RGBColor, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-
+# --- FONCTION GÉNÉRATION WORD ---
 def generate_word():
     doc = Document()
     
-    # --- Titre Principal ---
-    title = doc.add_heading(f"RAPPORT : {st.session_state.client_name.upper()}", 0)
+    # 1. Récupération sécurisée des variables
+    # On utilise .get() pour éviter que l'app crash si un champ est vide
+    nom_client = st.session_state.get('client_name', 'Client Inconnu').upper()
+    nom_tech = st.session_state.get('technicien', 'Non renseigné')
+    visite_date = str(st.session_state.get('date_visite', ''))
+    lieu = st.session_state.get('adresse', 'Non renseignée')
+    
+    # 2. Titre Principal
+    title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    # Au lieu de st.session_state.client_name.upper()
-nom_client = st.session_state.get('client_name', 'INCONNU').upper()
-title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
+    # 3. En-tête Infos
+    p = doc.add_paragraph()
+    p.add_run("Date de la visite : ").bold = True
+    p.add_run(f"{visite_date}\n")
+    p.add_run("Technicien : ").bold = True
+    p.add_run(f"{nom_tech}\n")
+    p.add_run("Adresse : ").bold = True
+    p.add_run(f"{lieu}")
 
-    # --- En-tête Infos ---
-p = doc.add_paragraph()
-p.add_run(f"Date de la visite : ").bold = True
-p.add_run(f"{date_visite}\n")
-p.add_run(f"Technicien : ").bold = True
-p.add_run(f"{technicien}\n")
-p.add_run(f"Adresse : ").bold = True
-p.add_run(f"{adresse}")
+    # 4. Participants
+    doc.add_heading("Participants", level=1)
+    # On vérifie que participants est bien une liste avant de boucler
+    parts = st.session_state.get('participants', [])
+    if isinstance(parts, list):
+        for part in parts:
+            if isinstance(part, dict):
+                nom_p = part.get('nom', '')
+                soc_p = part.get('societe', '')
+                doc.add_paragraph(f"• {nom_p} ({soc_p})", style='List Bullet')
 
-    # --- Participants ---
-doc.add_heading("Participants", level=1)
-for part in st.session_state.participants:
-    doc.add_paragraph(f"• {part.get('nom', '')} ({part.get('societe', '')})", style='List Bullet')
-
-    
-    # --- Sections et Photos ---
+    # 5. Sections et Photos
     doc.add_heading("Constats et Photos", level=1)
-    for s in st.session_state.sections:
-        # Titre de section en Bleu
-        h = doc.add_heading(s.get('titre', 'Sans titre'), level=2)
-        
+    sections = st.session_state.get('sections', [])
+    for s in sections:
+        # Titre de section
+        doc.add_heading(s.get('titre', 'Sans titre'), level=2)
         # Description
         doc.add_paragraph(s.get('description', ''))
-        
-        # Image (si présente)
+        # Image (si présente et si elle a un attribut getvalue)
         if s.get('image') is not None:
-            # On doit convertir l'image Streamlit en flux compatible Word
-            image_stream = io.BytesIO(s['image'].getvalue())
-            doc.add_picture(image_stream, width=Inches(4.0))
-            doc.add_paragraph() # Espace après l'image
+            try:
+                image_stream = io.BytesIO(s['image'].getvalue())
+                doc.add_picture(image_stream, width=Inches(4.0))
+                doc.add_paragraph() 
+            except:
+                doc.add_paragraph("[Image non disponible]")
 
-    # Sauvegarde dans un buffer
+    # 6. Sauvegarde dans le buffer
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
-# --- SECTION EXPORT FINAL WORD  ---
+# --- SECTION EXPORT FINAL (INTERFACE) ---
 st.divider()
 st.subheader("🏁 Finaliser le Rapport")
 
 col_pdf, col_word = st.columns(2)
 
 with col_pdf:
-    if st.button("📄 Générer le PDF"):
+    # On utilise une clé unique pour le bouton
+    if st.button("📄 Préparer le PDF"):
         pdf_content = generate_pdf()
-        st.download_button("⬇️ Télécharger PDF", data=pdf_content, file_name=f"Rapport_{client_name}.pdf")
+        st.download_button(
+            label="⬇️ Télécharger PDF",
+            data=pdf_content,
+            file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.pdf",
+            mime="application/pdf"
+        )
 
 with col_word:
-    # On génère le Word directement au clic
-    word_buffer = generate_word()
-    st.download_button(
-        label="📝 Télécharger en Word (.docx)",
-        data=word_buffer,
-        file_name=f"Rapport_{client_name}.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+    # On ne génère le buffer QUE si on clique sur le bouton
+    if st.button("📝 Préparer le Word"):
+        word_data = generate_word()
+        st.download_button(
+            label="⬇️ Télécharger Word (.docx)",
+            data=word_data,
+            file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
     
 # --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
 
