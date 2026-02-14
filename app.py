@@ -187,19 +187,59 @@ if st.button("🚀 GÉNÉRER LE RAPPORT PDF"):
 # --- PROCHAINE ÉTAPE : GOOGLE DRIVE ---
 # Note : Pour lier à Drive, il faudra configurer les "Secrets" dans Streamlit Cloud.
 
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaIoBaseUpload
 
-def upload_to_drive(file_path, folder_id=None):
-    # Chargement des accès utilisateur
-    creds = Credentials.from_authorized_user_file('token.json')
-    service = build('drive', 'v3', credentials=creds)
+# --- CONFIGURATION DRIVE ---
+# Remplacez par l'ID de votre dossier Drive (il est dans l'URL de votre dossier)
+FOLDER_ID = "VOTRE_ID_DE_DOSSIER_ICI" 
 
-    file_metadata = {'name': file_path}
-    if folder_id:
-        file_metadata['parents'] = [folder_id]
+def upload_to_drive(pdf_bytes, filename):
+    try:
+        # 1. Récupération des secrets
+        info = st.secrets["gcp_service_account"]
+        creds = service_account.Credentials.from_service_account_info(info)
+        service = build('drive', 'v3', credentials=creds)
 
-    media = MediaFileUpload(file_path, mimetype='application/pdf')
-    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-    return file.get('id')
+        # 2. Configuration du fichier
+        file_metadata = {
+            'name': filename,
+            'parents': [FOLDER_ID]
+        }
+        
+        # 3. Préparation du flux de données
+        fh = io.BytesIO(pdf_bytes)
+        media = MediaIoBaseUpload(fh, mimetype='application/pdf')
+
+        # 4. Envoi
+        file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        return file.get('id')
+    except Exception as e:
+        st.error(f"Erreur Drive : {e}")
+        return None
+
+# --- DANS VOTRE BOUTON DE GÉNÉRATION FINAL ---
+
+if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
+    if not client_name:
+        st.error("Veuillez saisir le nom du client.")
+    else:
+        with st.spinner("Génération du PDF et synchronisation Drive..."):
+            pdf_data = generate_pdf()
+            pdf_bytes = bytes(pdf_data)
+            
+            # 1. Sauvegarde sur Drive
+            filename = f"Rapport_{client_name}_{date_visite}.pdf"
+            file_id = upload_to_drive(pdf_bytes, filename)
+            
+            if file_id:
+                st.success(f"✅ Rapport sauvegardé sur Google Drive !")
+            
+            # 2. Proposer quand même le téléchargement local
+            st.download_button(
+                label="⬇️ Télécharger une copie locale",
+                data=pdf_bytes,
+                file_name=filename,
+                mime="application/pdf"
+            )
