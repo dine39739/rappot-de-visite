@@ -5,6 +5,8 @@ from PIL import Image
 import os
 import io
 from docx import Document
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH  # <--- Indispensable pour l'alignement
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
