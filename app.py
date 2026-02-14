@@ -322,35 +322,41 @@ def generate_word():
                 doc.add_paragraph(f"• {nom_p} ({soc_p})", style='List Bullet')
 
     # 5. Sections et Photos
+   # --- Sections et Photos ---
     doc.add_heading("Constats et Photos", level=1)
     
+    # On récupère la liste des sections
     sections = st.session_state.get('sections', [])
+    
     for s in sections:
-        doc.add_heading(s.get('titre', 'Sans titre'), level=2)
-        doc.add_paragraph(s.get('description', ''))
+        # 1. Ajout du titre de la section
+        titre_section = s.get('titre', 'Sans titre')
+        doc.add_heading(titre_section, level=2)
         
-        # Vérification de l'image
-        image_data = s.get('image')
-        if image_data is not None:
+        # 2. Ajout de la description
+        description_text = s.get('description', '')
+        doc.add_paragraph(description_text)
+        
+        # 3. Gestion de l'image (C'est ici que la magie opère)
+        if s.get('image') is not None:
             try:
-                # On convertit l'objet UploadedFile en flux binaire lisible par Word
+                # EXTRACTION : On récupère les octets de l'image
                 image_bytes = s['image'].getvalue()
+                
+                # CONVERSION : On crée un flux lisible par Word
                 image_stream = io.BytesIO(image_bytes)
                 
-                # Ajout de l'image avec une largeur fixe (ex: 5 pouces)
-                doc.add_picture(image_stream, width=Inches(5.0))
+                # INSERTION : On place l'image dans le document
+                # width=Inches(4.0) permet de garder une taille raisonnable
+                doc.add_picture(image_stream, width=Inches(4.0))
                 
-                # Petit espace de courtoisie après l'image
+                # ESPACEMENT : On ajoute un paragraphe vide pour ne pas coller le texte suivant
                 doc.add_paragraph() 
+                
             except Exception as e:
-                doc.add_paragraph(f"[Erreur lors de l'insertion de l'image : {e}]")
-
-    
-    # 6. Sauvegarde dans le buffer
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
+                # En cas de problème avec une image, on l'indique dans le Word sans bloquer le reste
+                p_err = doc.add_paragraph()
+                p_err.add_run(f"[Image non insérée : {e}]").italic = True
 
 # --- SECTION EXPORT FINAL (INTERFACE) ---
 st.divider()
