@@ -356,7 +356,7 @@ def generate_word():
 st.divider()
 st.subheader("🏁 Finaliser le Rapport")
 
-col_word = st.columns(2)
+col_word = st.columns(1)
 
 with col_word:
     # On génère le Word directement au clic
