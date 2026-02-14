@@ -265,6 +265,7 @@ st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; h
 
 # --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
 st.sidebar.title("💾 Gestion du Brouillon")
+st.sidebar.info("Sauvegardez votre saisie pour la reprendre plus tard sans rien perdre.")
 
 upload_brouillon = st.sidebar.file_uploader("Charger un fichier .json", type=["json"])
 
