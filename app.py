@@ -234,7 +234,7 @@ if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
             file_id = upload_to_drive(pdf_bytes, filename)
             
             if file_id: "1izwpTbS9x5fUI2a0UWQVWmlG3XcKNEDn"
-                st.success(f"✅ Rapport sauvegardé sur Google Drive !")
+            st.success(f"✅ Rapport sauvegardé sur Google Drive !")
             
             # 2. Proposer quand même le téléchargement local
             st.download_button(
