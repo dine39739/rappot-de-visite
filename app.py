@@ -93,7 +93,7 @@ def generate_pdf():
     # Couleurs RGB : Bleu foncé (0, 51, 102), Blanc (255, 255, 255)
     pdf.set_fill_color(0, 51, 102)  # Couleur du fond de l'encadré
     pdf.set_text_color(255, 255, 255) # Couleur du texte
-    pdf.set_font('DejaVu', '', 18)
+    pdf.set_font("helvetica", '', 18)
     
     # Header
     pdf.set_font("helvetica", 'B', 20)
