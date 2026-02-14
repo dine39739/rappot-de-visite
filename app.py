@@ -311,6 +311,10 @@ def generate_word():
     title = doc.add_heading(f"RAPPORT : {st.session_state.client_name.upper()}", 0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+    # Au lieu de st.session_state.client_name.upper()
+nom_client = st.session_state.get('client_name', 'INCONNU').upper()
+title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
+
     # --- En-tête Infos ---
     p = doc.add_paragraph()
     p.add_run(f"Date de la visite : ").bold = True
