@@ -186,3 +186,20 @@ if st.button("🚀 GÉNÉRER LE RAPPORT PDF"):
 
 # --- PROCHAINE ÉTAPE : GOOGLE DRIVE ---
 # Note : Pour lier à Drive, il faudra configurer les "Secrets" dans Streamlit Cloud.
+
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
+from googleapiclient.http import MediaFileUpload
+
+def upload_to_drive(file_path, folder_id=None):
+    # Chargement des accès utilisateur
+    creds = Credentials.from_authorized_user_file('token.json')
+    service = build('drive', 'v3', credentials=creds)
+
+    file_metadata = {'name': file_path}
+    if folder_id:
+        file_metadata['parents'] = [folder_id]
+
+    media = MediaFileUpload(file_path, mimetype='application/pdf')
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    return file.get('id')
