@@ -83,8 +83,8 @@ def generate_pdf():
     
     # --- 1. CHARGEMENT DE LA POLICE UNICODE ---
     # Assurez-vous que le fichier .ttf est bien sur votre GitHub
-    pdf.add_font("helvetica", '', 'DejaVuSans.ttf')
-    pdf.set_font("helvetica", '', 12)
+    pdf.add_font("DejaVu", '', 'DejaVuSans.ttf')
+    pdf.set_font("DejaVu", '', 12)
 
     # --- 2. EN-TÊTE AVEC LOGO ---
     # pdf.image(nom_du_fichier, x, y, largeur)
@@ -98,14 +98,14 @@ def generate_pdf():
     # Couleurs RGB : Bleu foncé (0, 51, 102), Blanc (255, 255, 255)
     pdf.set_fill_color(0, 51, 102)  # Couleur du fond de l'encadré
     pdf.set_text_color(255, 255, 255) # Couleur du texte
-    pdf.set_font("helvetica", '', 18)
+    pdf.set_font("DejaVu", '', 18)
     
     # Cell(largeur, hauteur, texte, bordure, retour ligne, alignement, remplissage)
     pdf.cell(0, 15, "RAPPORT D'INTERVENTION TECHNIQUE", ln=True, align='C', fill=True)
     
     # --- 4. RÉINITIALISATION POUR LE RESTE DU TEXTE ---
     pdf.set_text_color(0, 0, 0) # On repasse en noir
-    pdf.set_font("helvetica", '', 11)
+    pdf.set_font("DejaVu", '', 11)
     pdf.ln(5)
     
     # Infos générales (sous le titre)
@@ -120,7 +120,7 @@ def generate_pdf():
         pdf.set_font("helvetica", '', 12)
         pdf.set_fill_color(230, 230, 230) # Gris très clair
         pdf.cell(0, 10, " PERSONNES PRÉSENTES", ln=True, fill=True)
-        pdf.set_font("helvetica", '', 10)
+        pdf.set_font("DejaVu", '', 10)
         for p in st.session_state.participants:
             pdf.cell(0, 8, f"• {p['nom']} (Tél: {p['tel']} | Email: {p['email']})", ln=True)
         pdf.ln(10)
