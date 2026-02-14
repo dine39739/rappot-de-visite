@@ -305,24 +305,23 @@ from docx.shared import Inches, RGBColor, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 def generate_word():
-    doc = Document()
+    doc = Document() # 4 espaces ici
     
     # --- Titre Principal ---
-    title = doc.add_heading(f"RAPPORT : {st.session_state.client_name.upper()}", 0)
+    nom_client = st.session_state.get('client_name', 'INCONNU').upper()
+    title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    # Au lieu de st.session_state.client_name.upper()
-nom_client = st.session_state.get('client_name', 'INCONNU').upper()
-title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
-
     # --- En-tête Infos ---
-    p = doc.add_paragraph()
+    p = doc.add_paragraph() # <--- Vérifiez bien l'alignement ici !
     p.add_run(f"Date de la visite : ").bold = True
-    p.add_run(f"{date_visite}\n")
+    p.add_run(f"{st.session_state.get('date_visite', '')}\n")
     p.add_run(f"Technicien : ").bold = True
-    p.add_run(f"{technicien}\n")
+    p.add_run(f"{st.session_state.get('technicien', '')}\n")
     p.add_run(f"Adresse : ").bold = True
-    p.add_run(f"{adresse}")
+    p.add_run(f"{st.session_state.get('adresse', '')}")
+    
+
 
     # --- Participants ---
     doc.add_heading("Participants", level=1)
