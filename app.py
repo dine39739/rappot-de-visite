@@ -11,7 +11,7 @@ from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # --- CONFIGURATION DE LA PAGE ---
-st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
+st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🗂️")
 
 # --- INITIALISATION DU SESSION STATE ---
 if 'participants' not in st.session_state:
@@ -71,6 +71,9 @@ def base64_to_images(sections_data):
                     restored_photos.append(buf)
                 except: continue
             s['photos'] = restored_photos
+        # Initialiser photos vide si pas de photos_base64
+        elif 'photos' not in s:
+            s['photos'] = []
     return sections_data
 
 # --- FONCTION GÉNÉRATION PDF (CORRIGÉE : POLICE STANDARD) ---
@@ -229,32 +232,59 @@ uploaded_file = st.sidebar.file_uploader("📂 Charger JSON", type=["json"])
 if uploaded_file and st.sidebar.button("♻️ RESTAURER"):
     try:
         data = json.load(uploaded_file)
-        # Nettoyage des widgets
-        for k in list(st.session_state.keys()):
-            if k.startswith(('p_nom','p_tel','p_mail','sec_','cli_','adr_','tec_')):
-                del st.session_state[k]
-
+        
+        # Restauration des données dans session_state
         st.session_state.client_name = data.get("client_name", "")
         st.session_state.adresse = data.get("adresse", "")
         st.session_state.technicien = data.get("technicien", "")
-        try: st.session_state.date_visite = datetime.strptime(data.get("date_visite"), "%Y-%m-%d").date()
-        except: st.session_state.date_visite = date.today()
+        try: 
+            st.session_state.date_visite = datetime.strptime(data.get("date_visite"), "%Y-%m-%d").date()
+        except: 
+            st.session_state.date_visite = date.today()
         
         st.session_state.participants = data.get("participants", [])
         st.session_state.sections = base64_to_images(data.get("sections", []))
+        
+        # CORRECTION : Nettoyer les clés des widgets APRÈS la restauration
+        # pour forcer le rafraîchissement au prochain rerun
+        keys_to_delete = []
+        for k in st.session_state.keys():
+            if k.startswith(('p_nom','p_tel','p_mail','sec_','cli_','adr_','tec_')):
+                keys_to_delete.append(k)
+        
+        for k in keys_to_delete:
+            del st.session_state[k]
+        
+        st.sidebar.success("✅ Données restaurées avec succès!")
         st.rerun()
     except Exception as e:
-        st.sidebar.error(f"Erreur: {e}")
+        st.sidebar.error(f"❌ Erreur lors de la restauration: {e}")
 
 # --- INTERFACE ---
-st.title("🏗️ Générateur de Rapport")
+st.title("🗂️ Générateur de Rapport")
 
 with st.expander("📌 Informations", expanded=True):
     c1, c2 = st.columns(2)
-    st.session_state.client_name = c1.text_input("Client", value=st.session_state.client_name, key="cli_val")
-    st.session_state.adresse = c1.text_input("Adresse", value=st.session_state.adresse, key="adr_val")
-    st.session_state.date_visite = c2.date_input("Date", value=st.session_state.date_visite)
-    st.session_state.technicien = c2.text_input("Technicien", value=st.session_state.technicien, key="tec_val")
+    # CORRECTION : Utiliser la valeur de session_state comme source de vérité
+    st.session_state.client_name = c1.text_input(
+        "Client", 
+        value=st.session_state.client_name, 
+        key="cli_val"
+    )
+    st.session_state.adresse = c1.text_input(
+        "Adresse", 
+        value=st.session_state.adresse, 
+        key="adr_val"
+    )
+    st.session_state.date_visite = c2.date_input(
+        "Date", 
+        value=st.session_state.date_visite
+    )
+    st.session_state.technicien = c2.text_input(
+        "Technicien", 
+        value=st.session_state.technicien, 
+        key="tec_val"
+    )
 
 st.header("👥 Participants")
 if st.button("➕ Ajouter Participant"):
@@ -272,26 +302,51 @@ for i, p in enumerate(st.session_state.participants):
 st.header("📝 Sections")
 for idx, sec in enumerate(st.session_state.sections):
     with st.container():
-        sec['titre'] = st.text_input(f"Titre Section {idx+1}", value=sec.get('titre',''), key=f"sec_titre_{idx}")
-        sec['description'] = st.text_area(f"Détails Section {idx+1}", value=sec.get('description',''), key=f"sec_desc_{idx}")
-        if sec.get('photos'): st.info(f"{len(sec['photos'])} photo(s)")
+        sec['titre'] = st.text_input(
+            f"Titre Section {idx+1}", 
+            value=sec.get('titre',''), 
+            key=f"sec_titre_{idx}"
+        )
+        sec['description'] = st.text_area(
+            f"Détails Section {idx+1}", 
+            value=sec.get('description',''), 
+            key=f"sec_desc_{idx}"
+        )
+        if sec.get('photos'): 
+            st.info(f"📷 {len(sec['photos'])} photo(s) chargée(s)")
         
-        new = st.file_uploader(f"Photos {idx+1}", accept_multiple_files=True, key=f"sec_img_{idx}")
-        if new: sec['photos'] = new
+        new = st.file_uploader(
+            f"Photos Section {idx+1}", 
+            accept_multiple_files=True, 
+            key=f"sec_img_{idx}"
+        )
+        if new: 
+            sec['photos'] = new
         
         if st.button(f"🗑️ Supprimer Section {idx+1}", key=f"del_sec_{idx}"):
-            st.session_state.sections.pop(idx); st.rerun()
+            st.session_state.sections.pop(idx)
+            st.rerun()
         st.divider()
 
 if st.button("➕ Ajouter Section"):
-    st.session_state.sections.append({'titre': '', 'description': '', 'photos': []}); st.rerun()
+    st.session_state.sections.append({'titre': '', 'description': '', 'photos': []})
+    st.rerun()
 
-st.header("🏁 Export")
+st.header("📤 Export")
 c1, c2 = st.columns(2)
 with c1:
-    if st.button("📄 PDF"):
+    if st.button("📄 Générer PDF"):
         res = generate_pdf()
-        st.download_button("Télécharger PDF", bytes(res) if not isinstance(res, str) else res.encode('latin-1'), "rapport.pdf", "application/pdf")
+        st.download_button(
+            "📥 Télécharger PDF", 
+            bytes(res) if not isinstance(res, str) else res.encode('latin-1'), 
+            "rapport.pdf", 
+            "application/pdf"
+        )
 with c2:
-    if st.button("📝 Word"):
-        st.download_button("Télécharger Word", generate_word().getvalue(), "rapport.docx")
+    if st.button("📝 Générer Word"):
+        st.download_button(
+            "📥 Télécharger Word", 
+            generate_word().getvalue(), 
+            "rapport.docx"
+        )
