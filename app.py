@@ -210,66 +210,6 @@ def generate_word():
     buffer.seek(0)
     return buffer
 
-L'erreur vient du fait que Streamlit donne la priorité à l'état visuel du "widget" (la zone de texte) plutôt qu'à la variable stockée en mémoire. Pour corriger cela, il faut effectuer une opération de nettoyage forcé (un "reset") des clés des widgets lors de l'importation.
-
-Voici le code corrigé. J'ai ajouté un bloc spécifique dans la partie Restauration qui supprime les clés t_0 (titre section 1) et d_0 (description section 1) pour forcer Streamlit à les recréer avec le texte du fichier JSON.
-
-Code complet app.py corrigé
-Python
-import streamlit as st
-from datetime import date, datetime
-from fpdf import FPDF
-from PIL import Image
-import os
-import io
-import json
-import base64
-from docx import Document
-
-# --- CONFIGURATION ---
-st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
-
-# --- INITIALISATION ---
-if 'participants' not in st.session_state:
-    st.session_state.participants = []
-if 'sections' not in st.session_state:
-    st.session_state.sections = [{'titre': '', 'description': '', 'photos': []}]
-
-# Initialisation des infos générales
-for key in ['cli_val', 'adr_val', 'tec_val']:
-    if key not in st.session_state: st.session_state[key] = ""
-if 'date_val' not in st.session_state: st.session_state['date_val'] = date.today()
-
-# --- FONCTIONS DE CONVERSION ---
-def images_to_base64(sections):
-    sections_copy = []
-    for s in sections:
-        new_sec = s.copy()
-        if s.get('photos'):
-            photos_data = []
-            for img in s['photos']:
-                try:
-                    img_bytes = img.getvalue() if hasattr(img, 'getvalue') else img.read()
-                    encoded = base64.b64encode(img_bytes).decode()
-                    photos_data.append({"name": getattr(img, 'name', 'photo.jpg'), "content": encoded})
-                except: continue
-            new_sec['photos_base64'] = photos_data
-        if 'photos' in new_sec: del new_sec['photos']
-        sections_copy.append(new_sec)
-    return sections_copy
-
-def base64_to_images(sections_data):
-    for s in sections_data:
-        if s.get('photos_base64'):
-            restored = []
-            for p in s['photos_base64']:
-                try:
-                    buf = io.BytesIO(base64.b64decode(p['content']))
-                    buf.name = p['name']
-                    restored.append(buf)
-                except: continue
-            s['photos'] = restored
-    return sections_data
 
 # --- SIDEBAR : SAUVEGARDE & RESTAURATION ---
 st.sidebar.header("💾 Gestion du Dossier")
