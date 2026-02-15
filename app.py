@@ -8,25 +8,24 @@ import json
 import base64
 from docx import Document
 from docx.shared import Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
 
-# --- INITIALISATION DES VARIABLES ---
+# --- INITIALISATION ---
 if 'participants' not in st.session_state:
     st.session_state.participants = []
 if 'sections' not in st.session_state:
     st.session_state.sections = [{'titre': '', 'description': '', 'photos': []}]
 
-# Initialisation des champs d'infos pour éviter les erreurs au premier chargement
+# Initialisation des clés d'informations fixes
 for key in ['cli_val', 'adr_val', 'tec_val']:
     if key not in st.session_state:
         st.session_state[key] = ""
 if 'date_val' not in st.session_state:
     st.session_state['date_val'] = date.today()
 
-# --- FONCTIONS DE CONVERSION ---
+# --- FONCTIONS TECHNIQUES ---
 def images_to_base64(sections):
     sections_copy = []
     for s in sections:
@@ -57,7 +56,7 @@ def base64_to_images(sections_data):
             s['photos'] = restored
     return sections_data
 
-# --- GÉNÉRATION DOCUMENTS ---
+# --- GÉNÉRATION PDF (VOTRE MISE EN PAGE) ---
 def generate_pdf():
     pdf = FPDF()
     pdf.add_page()
@@ -94,10 +93,9 @@ def generate_pdf():
                 except: continue
     return pdf.output()
 
-# --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION ---
+# --- SIDEBAR : SAUVEGARDE ET RESTAURATION ---
 st.sidebar.header("💾 Gestion du Dossier")
 
-# Sauvegarde
 save_data = {
     "client_name": st.session_state.cli_val,
     "adresse": st.session_state.adr_val,
@@ -106,14 +104,14 @@ save_data = {
     "participants": st.session_state.participants,
     "sections": images_to_base64(st.session_state.sections)
 }
-st.sidebar.download_button("📥 Télécharger Sauvegarde JSON", json.dumps(save_data, indent=4), "sauvegarde.json")
+st.sidebar.download_button("📥 Télécharger JSON", json.dumps(save_data, indent=4), "sauvegarde.json")
 
-# Restauration
 uploaded = st.sidebar.file_uploader("📂 Charger un fichier JSON", type=["json"])
+
 if uploaded and st.sidebar.button("♻️ RESTAURER LES DONNÉES"):
     data = json.load(uploaded)
     
-    # ÉTAPE CRUCIALE : On met à jour le session_state DIRECTEMENT
+    # Mise à jour des infos fixes
     st.session_state.cli_val = data.get("client_name", "")
     st.session_state.adr_val = data.get("adresse", "")
     st.session_state.tec_val = data.get("technicien", "")
@@ -123,24 +121,30 @@ if uploaded and st.sidebar.button("♻️ RESTAURER LES DONNÉES"):
         st.session_state.date_val = date.today()
     
     st.session_state.participants = data.get("participants", [])
-    st.session_state.sections = base64_to_images(data.get("sections", []))
     
-    # On force le rafraîchissement pour que les widgets lisent les nouvelles valeurs
+    # Mise à jour des sections (Toiture, etc.)
+    # On reconstruit les images base64 -> BytesIO
+    restored_sections = base64_to_images(data.get("sections", []))
+    st.session_state.sections = restored_sections
+
+    # TRÈS IMPORTANT : On efface les clés de widgets des sections pour forcer Streamlit 
+    # à relire les données depuis st.session_state.sections
+    for k in list(st.session_state.keys()):
+        if k.startswith(('t_', 'd_', 'img_')):
+            del st.session_state[k]
+    
     st.rerun()
 
 # --- INTERFACE PRINCIPALE ---
 st.title("🏗️ Tech-Report Pro")
 
-# BLOC INFOS
 with st.expander("📌 Informations du Chantier", expanded=True):
     col1, col2 = st.columns(2)
-    # L'astuce est ici : on n'utilise pas 'value', le widget est lié directement à la clé
     st.text_input("Nom du Client / Projet", key="cli_val")
     st.text_input("Adresse de l'intervention", key="adr_val")
     st.text_input("Technicien responsable", key="tec_val")
     st.date_input("Date de la visite", key="date_val")
 
-# BLOC PARTICIPANTS
 st.header("👥 Participants")
 if st.button("➕ Ajouter un participant"):
     st.session_state.participants.append({"nom": "", "tel": "", "email": ""})
@@ -148,7 +152,6 @@ if st.button("➕ Ajouter un participant"):
 
 for i, p in enumerate(st.session_state.participants):
     c1, c2, c3, c4 = st.columns([3, 2, 3, 1])
-    # Pour les listes, on met à jour l'objet p en direct
     p['nom'] = c1.text_input(f"Nom {i}", value=p.get('nom',''), key=f"pnom_{i}")
     p['tel'] = c2.text_input(f"Tél {i}", value=p.get('tel',''), key=f"ptel_{i}")
     p['email'] = c3.text_input(f"Email {i}", value=p.get('email',''), key=f"pmail_{i}")
@@ -156,22 +159,34 @@ for i, p in enumerate(st.session_state.participants):
         st.session_state.participants.pop(i)
         st.rerun()
 
-# BLOC SECTIONS
-
 st.header("📝 Corps du Rapport")
+
+# BOUCLE DES SECTIONS
 for idx, sec in enumerate(st.session_state.sections):
     with st.container():
         st.subheader(f"Section {idx+1}")
-        # On utilise value=sec.get(...) pour les éléments de liste
-        sec['titre'] = st.text_input(f"Titre S{idx+1}", value=sec.get('titre',''), key=f"t_{idx}")
-        sec['description'] = st.text_area(f"Observations S{idx+1}", value=sec.get('description',''), key=f"d_{idx}")
+        
+        # On utilise value=sec.get(...) ET on met à jour la liste en direct
+        # L'utilisation de value assure que même si la clé change, le texte reste
+        st.session_state.sections[idx]['titre'] = st.text_input(
+            f"Titre Section {idx+1}", 
+            value=sec.get('titre', ''), 
+            key=f"t_{idx}"
+        )
+        
+        st.session_state.sections[idx]['description'] = st.text_area(
+            f"Observations Section {idx+1}", 
+            value=sec.get('description', ''), 
+            key=f"d_{idx}",
+            height=200
+        )
         
         if sec.get('photos'):
-            st.info(f"📸 {len(sec['photos'])} photo(s) chargée(s)")
+            st.success(f"📸 {len(sec['photos'])} photo(s) chargée(s) pour cette section.")
         
-        new_imgs = st.file_uploader(f"Ajouter des photos S{idx+1}", accept_multiple_files=True, key=f"img_{idx}")
+        new_imgs = st.file_uploader(f"Ajouter/Remplacer photos S{idx+1}", accept_multiple_files=True, key=f"img_{idx}")
         if new_imgs:
-            sec['photos'] = new_imgs
+            st.session_state.sections[idx]['photos'] = new_imgs
             
         if st.button(f"🗑️ Supprimer Section {idx+1}", key=f"sdel_{idx}"):
             st.session_state.sections.pop(idx)
@@ -186,4 +201,3 @@ if st.button("➕ Ajouter une Section"):
 if st.button("📄 Générer le Rapport PDF"):
     pdf_res = generate_pdf()
     st.download_button("⬇️ Télécharger PDF", bytes(pdf_res) if not isinstance(pdf_res, str) else pdf_res.encode('latin-1'), f"Rapport_{st.session_state.cli_val}.pdf", "application/pdf")
-    
