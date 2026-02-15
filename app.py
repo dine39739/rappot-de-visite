@@ -210,88 +210,149 @@ def generate_word():
     buffer.seek(0)
     return buffer
 
-# --- SIDEBAR : SAUVEGARDE & RESTAURATION ---
-st.sidebar.header("💾 Sauvegarde / Restauration")
+L'erreur vient du fait que Streamlit donne la priorité à l'état visuel du "widget" (la zone de texte) plutôt qu'à la variable stockée en mémoire. Pour corriger cela, il faut effectuer une opération de nettoyage forcé (un "reset") des clés des widgets lors de l'importation.
 
-# 1. Sauvegarder
-save_data = {
-    "client_name": st.session_state.client_name,
-    "adresse": st.session_state.adresse,
-    "technicien": st.session_state.technicien,
-    "date_visite": str(st.session_state.date_visite),
+Voici le code corrigé. J'ai ajouté un bloc spécifique dans la partie Restauration qui supprime les clés t_0 (titre section 1) et d_0 (description section 1) pour forcer Streamlit à les recréer avec le texte du fichier JSON.
+
+Code complet app.py corrigé
+Python
+import streamlit as st
+from datetime import date, datetime
+from fpdf import FPDF
+from PIL import Image
+import os
+import io
+import json
+import base64
+from docx import Document
+
+# --- CONFIGURATION ---
+st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
+
+# --- INITIALISATION ---
+if 'participants' not in st.session_state:
+    st.session_state.participants = []
+if 'sections' not in st.session_state:
+    st.session_state.sections = [{'titre': '', 'description': '', 'photos': []}]
+
+# Initialisation des infos générales
+for key in ['cli_val', 'adr_val', 'tec_val']:
+    if key not in st.session_state: st.session_state[key] = ""
+if 'date_val' not in st.session_state: st.session_state['date_val'] = date.today()
+
+# --- FONCTIONS DE CONVERSION ---
+def images_to_base64(sections):
+    sections_copy = []
+    for s in sections:
+        new_sec = s.copy()
+        if s.get('photos'):
+            photos_data = []
+            for img in s['photos']:
+                try:
+                    img_bytes = img.getvalue() if hasattr(img, 'getvalue') else img.read()
+                    encoded = base64.b64encode(img_bytes).decode()
+                    photos_data.append({"name": getattr(img, 'name', 'photo.jpg'), "content": encoded})
+                except: continue
+            new_sec['photos_base64'] = photos_data
+        if 'photos' in new_sec: del new_sec['photos']
+        sections_copy.append(new_sec)
+    return sections_copy
+
+def base64_to_images(sections_data):
+    for s in sections_data:
+        if s.get('photos_base64'):
+            restored = []
+            for p in s['photos_base64']:
+                try:
+                    buf = io.BytesIO(base64.b64decode(p['content']))
+                    buf.name = p['name']
+                    restored.append(buf)
+                except: continue
+            s['photos'] = restored
+    return sections_data
+
+# --- SIDEBAR : SAUVEGARDE & RESTAURATION ---
+st.sidebar.header("💾 Gestion du Dossier")
+
+# 1. SAUVEGARDE
+save_dict = {
+    "client_name": st.session_state.cli_val,
+    "adresse": st.session_state.adr_val,
+    "technicien": st.session_state.tec_val,
+    "date_intervention": str(st.session_state.date_val),
     "participants": st.session_state.participants,
     "sections": images_to_base64(st.session_state.sections)
 }
-st.sidebar.download_button("📥 Sauvegarder JSON", json.dumps(save_data, indent=4), "sauvegarde.json")
+st.sidebar.download_button("📥 Sauvegarder JSON", json.dumps(save_dict, indent=4), "sauvegarde.json")
 
-# 2. Restaurer
-uploaded_file = st.sidebar.file_uploader("📂 Charger JSON", type=["json"])
-if uploaded_file and st.sidebar.button("♻️ RESTAURER"):
+# 2. RESTAURATION (CORRIGÉE)
+uploaded = st.sidebar.file_uploader("📂 Charger JSON", type=["json"])
+if uploaded and st.sidebar.button("♻️ RESTAURER"):
+    data = json.load(uploaded)
+    
+    # Étape A : Nettoyage radical des widgets existants
+    # On supprime toutes les clés de texte des sections pour forcer le rafraîchissement
+    for key in list(st.session_state.keys()):
+        if key.startswith(('t_', 'd_', 'cli_val', 'adr_val', 'tec_val')):
+            del st.session_state[key]
+            
+    # Étape B : Injection des données du fichier dans le State
+    st.session_state.cli_val = data.get("client_name", "")
+    st.session_state.adr_val = data.get("adresse", "")
+    st.session_state.tec_val = data.get("technicien", "")
     try:
-        data = json.load(uploaded_file)
-        # Nettoyage des widgets
-        for k in list(st.session_state.keys()):
-            if k.startswith(('p_nom','p_tel','p_mail','sec_','cli_','adr_','tec_')):
-                del st.session_state[k]
-
-        st.session_state.client_name = data.get("client_name", "")
-        st.session_state.adresse = data.get("adresse", "")
-        st.session_state.technicien = data.get("technicien", "")
-        try: st.session_state.date_visite = datetime.strptime(data.get("date_visite"), "%Y-%m-%d").date()
-        except: st.session_state.date_visite = date.today()
+        st.session_state.date_val = datetime.strptime(data.get("date_intervention"), "%Y-%m-%d").date()
+    except:
+        st.session_state.date_val = date.today()
         
-        st.session_state.participants = data.get("participants", [])
-        st.session_state.sections = base64_to_images(data.get("sections", []))
-        st.rerun()
-    except Exception as e:
-        st.sidebar.error(f"Erreur: {e}")
-
-# --- INTERFACE ---
-st.title("🏗️ Générateur de Rapport")
-
-with st.expander("📌 Informations", expanded=True):
-    c1, c2 = st.columns(2)
-    st.session_state.client_name = c1.text_input("Client", value=st.session_state.client_name, key="cli_val")
-    st.session_state.adresse = c1.text_input("Adresse", value=st.session_state.adresse, key="adr_val")
-    st.session_state.date_visite = c2.date_input("Date", value=st.session_state.date_visite)
-    st.session_state.technicien = c2.text_input("Technicien", value=st.session_state.technicien, key="tec_val")
-
-st.header("👥 Participants")
-if st.button("➕ Ajouter Participant"):
-    st.session_state.participants.append({"nom": "", "tel": "", "email": ""})
+    st.session_state.participants = data.get("participants", [])
+    st.session_state.sections = base64_to_images(data.get("sections", []))
+    
+    # Étape C : Relance l'application pour afficher les nouvelles valeurs
     st.rerun()
 
-for i, p in enumerate(st.session_state.participants):
-    c1, c2, c3, c4 = st.columns([3, 2, 3, 1])
-    p['nom'] = c1.text_input(f"Nom {i+1}", value=p.get('nom',''), key=f"p_nom_{i}")
-    p['tel'] = c2.text_input(f"Tél {i+1}", value=p.get('tel',''), key=f"p_tel_{i}")
-    p['email'] = c3.text_input(f"Email {i+1}", value=p.get('email',''), key=f"p_mail_{i}")
-    if c4.button("🗑️", key=f"del_p_{i}"):
-        st.session_state.participants.pop(i); st.rerun()
+# --- INTERFACE ---
+st.title("🏗️ Tech-Report Pro")
 
-st.header("📝 Sections")
+with st.expander("📌 Informations Chantier", expanded=True):
+    st.text_input("Client", key="cli_val")
+    st.text_input("Adresse", key="adr_val")
+    st.text_input("Technicien", key="tec_val")
+    st.date_input("Date", key="date_val")
+
+st.header("📝 Corps du Rapport")
+
+# Affichage dynamique des sections
 for idx, sec in enumerate(st.session_state.sections):
     with st.container():
-        sec['titre'] = st.text_input(f"Titre Section {idx+1}", value=sec.get('titre',''), key=f"sec_titre_{idx}")
-        sec['description'] = st.text_area(f"Détails Section {idx+1}", value=sec.get('description',''), key=f"sec_desc_{idx}")
-        if sec.get('photos'): st.info(f"{len(sec['photos'])} photo(s)")
+        st.subheader(f"Section {idx+1}")
         
-        new = st.file_uploader(f"Photos {idx+1}", accept_multiple_files=True, key=f"sec_img_{idx}")
-        if new: sec['photos'] = new
+        # On force la valeur à venir du session_state.sections
+        # Cela garantit que "Toiture" s'affiche bien après l'import
+        st.session_state.sections[idx]['titre'] = st.text_input(
+            f"Titre Section {idx+1}", 
+            value=sec.get('titre', ''), 
+            key=f"t_{idx}"
+        )
         
-        if st.button(f"🗑️ Supprimer Section {idx+1}", key=f"del_sec_{idx}"):
-            st.session_state.sections.pop(idx); st.rerun()
+        st.session_state.sections[idx]['description'] = st.text_area(
+            f"Observations Section {idx+1}", 
+            value=sec.get('description', ''), 
+            key=f"d_{idx}"
+        )
+        
+        if sec.get('photos'):
+            st.info(f"📸 {len(sec['photos'])} photo(s) chargée(s)")
+        
+        new_imgs = st.file_uploader(f"Photos S{idx+1}", accept_multiple_files=True, key=f"img_{idx}")
+        if new_imgs:
+            st.session_state.sections[idx]['photos'] = new_imgs
+            
+        if st.button(f"🗑️ Supprimer Section {idx+1}", key=f"sdel_{idx}"):
+            st.session_state.sections.pop(idx)
+            st.rerun()
         st.divider()
 
-if st.button("➕ Ajouter Section"):
-    st.session_state.sections.append({'titre': '', 'description': '', 'photos': []}); st.rerun()
-
-st.header("🏁 Export")
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("📄 PDF"):
-        res = generate_pdf()
-        st.download_button("Télécharger PDF", bytes(res) if not isinstance(res, str) else res.encode('latin-1'), "rapport.pdf", "application/pdf")
-with c2:
-    if st.button("📝 Word"):
-        st.download_button("Télécharger Word", generate_word().getvalue(), "rapport.docx")
+if st.button("➕ Ajouter une Section"):
+    st.session_state.sections.append({'titre': '', 'description': '', 'photos': []})
+    st.rerun()
