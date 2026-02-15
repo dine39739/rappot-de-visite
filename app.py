@@ -13,7 +13,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
 
-# --- INITIALISATION DU SESSION STATE ---
+# --- INITIALISATION ---
 if 'participants' not in st.session_state:
     st.session_state.participants = []
 if 'sections' not in st.session_state:
@@ -83,7 +83,7 @@ def generate_pdf():
                     continue
     return pdf.output()
 
-# --- GÉNÉRATION WORD (CORRIGÉE) ---
+# --- GÉNÉRATION WORD ---
 def generate_word():
     doc = Document()
     client = st.session_state.get('client_name', 'SANS NOM')
@@ -96,11 +96,46 @@ def generate_word():
         if s.get('photos'):
             for img_file in s['photos']:
                 try:
-                    # Correction du bloc try/except qui causait l'erreur
                     image_stream = io.BytesIO(img_file.getvalue())
                     doc.add_picture(image_stream, width=Inches(3.5))
-                except Exception:
+                except:
                     continue
-                    
+    
     buffer = io.BytesIO()
-    doc.save(buffer
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# --- SIDEBAR (SAUVEGARDE / RESTAURATION) ---
+st.sidebar.header("💾 Gestion du Brouillon")
+
+save_dict = {
+    "client_name": st.session_state.get('client_name', ''),
+    "adresse": st.session_state.get('adresse', ''),
+    "technicien": st.session_state.get('technicien', ''),
+    "date_intervention": str(st.session_state.get('date_intervention', date.today())),
+    "participants": st.session_state.get('participants', []),
+    "sections": images_to_base64(st.session_state.sections)
+}
+
+st.sidebar.download_button(
+    label="📥 Sauvegarder en JSON",
+    data=json.dumps(save_dict, indent=4),
+    file_name="sauvegarde.json",
+    mime="application/json"
+)
+
+uploaded = st.sidebar.file_uploader("📂 Charger JSON", type="json")
+
+if uploaded and st.sidebar.button("♻️ RESTAURER"):
+    d = json.load(uploaded)
+    # Nettoyage des clés widgets
+    for k in list(st.session_state.keys()):
+        if k.startswith(('t_','d_','pnom_','ptel_','pmail_','cl_','ad_')):
+            del st.session_state[k]
+    
+    st.session_state.client_name = d.get('client_name', "")
+    st.session_state.adresse = d.get('adresse', "")
+    st.session_state.technicien = d.get('technicien', "")
+    st.session_state.participants = d.get('participants', [])
+    st.session_state.sections = base64_to_images(d.get('sections
