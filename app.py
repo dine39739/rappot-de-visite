@@ -10,7 +10,7 @@ from docx import Document
 from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# --- CONFIGURATION DE LA PAGE ---
+# --- CONFIGURATION ---
 st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
 
 # --- INITIALISATION DU SESSION STATE ---
@@ -19,7 +19,7 @@ if 'participants' not in st.session_state:
 if 'sections' not in st.session_state:
     st.session_state.sections = [{'titre': '', 'description': '', 'photos': []}]
 
-# --- FONCTIONS TECHNIQUES (IMAGES & SAUVEGARDE) ---
+# --- FONCTIONS DE CONVERSION ---
 def images_to_base64(sections):
     sections_copy = []
     for s in sections:
@@ -30,9 +30,11 @@ def images_to_base64(sections):
                 try:
                     encoded = base64.b64encode(img.getvalue()).decode()
                     photos_data.append({"name": getattr(img, 'name', 'img.jpg'), "content": encoded})
-                except: continue
+                except:
+                    continue
             new_sec['photos_base64'] = photos_data
-        if 'photos' in new_sec: del new_sec['photos']
+        if 'photos' in new_sec:
+            del new_sec['photos']
         sections_copy.append(new_sec)
     return sections_copy
 
@@ -47,7 +49,7 @@ def base64_to_images(sections_data):
             s['photos'] = restored
     return sections_data
 
-# --- GÉNÉRATION DES DOCUMENTS ---
+# --- GÉNÉRATION PDF ---
 def generate_pdf():
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -77,16 +79,28 @@ def generate_pdf():
                     if pdf.get_y() > 220: pdf.add_page()
                     pdf.image(temp, w=80)
                     os.remove(temp)
-                except: continue
+                except:
+                    continue
     return pdf.output()
 
+# --- GÉNÉRATION WORD (CORRIGÉE) ---
 def generate_word():
     doc = Document()
     client = st.session_state.get('client_name', 'SANS NOM')
     doc.add_heading(f"RAPPORT : {client}", 0)
+    
     for s in st.session_state.sections:
         doc.add_heading(s.get('titre', 'Sans titre'), level=2)
         doc.add_paragraph(s.get('description', ''))
+        
         if s.get('photos'):
             for img_file in s['photos']:
-                try: doc.add_picture(io.BytesIO(img_file.getvalue()), width=Inches(3.5))
+                try:
+                    # Correction du bloc try/except qui causait l'erreur
+                    image_stream = io.BytesIO(img_file.getvalue())
+                    doc.add_picture(image_stream, width=Inches(3.5))
+                except Exception:
+                    continue
+                    
+    buffer = io.BytesIO()
+    doc.save(buffer
