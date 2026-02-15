@@ -366,7 +366,6 @@ with col_word:
     
 # --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
 
-# --- SIDEBAR : SAUVEGARDE ET RESTAURATION ---
 st.sidebar.header("💾 Gestion du Dossier")
 
 save_data = {
@@ -384,28 +383,23 @@ uploaded = st.sidebar.file_uploader("📂 Charger un fichier JSON", type=["json"
 if uploaded and st.sidebar.button("♻️ RESTAURER LES DONNÉES"):
     data = json.load(uploaded)
     
-    # Mise à jour des infos fixes
+    # 1. CETTE BOUCLE EST LA CORRECTION : 
+    # Elle supprime les anciennes valeurs des cases (widgets)
+    # 't_' pour les titres, 'd_' pour les descriptions
+    for key in list(st.session_state.keys()):
+        if key.startswith(('t_', 'd_', 'cli_val', 'adr_val', 'tec_val')):
+            del st.session_state[key]
+            
+    # 2. Injection des données du fichier JSON dans la mémoire
     st.session_state.cli_val = data.get("client_name", "")
     st.session_state.adr_val = data.get("adresse", "")
     st.session_state.tec_val = data.get("technicien", "")
-    try:
-        st.session_state.date_val = datetime.strptime(data.get("date_visite"), "%Y-%m-%d").date()
-    except:
-        st.session_state.date_val = date.today()
     
-    st.session_state.participants = data.get("participants", [])
+    # Restauration des sections (Toiture, etc.)
+    st.session_state.sections = base64_to_images(data.get("sections", []))
     
-    # Mise à jour des sections (Toiture, etc.)
-    # On reconstruit les images base64 -> BytesIO
-    restored_sections = base64_to_images(data.get("sections", []))
-    st.session_state.sections = restored_sections
-
-    # TRÈS IMPORTANT : On efface les clés de widgets des sections pour forcer Streamlit 
-    # à relire les données depuis st.session_state.sections
-    for k in list(st.session_state.keys()):
-        if k.startswith(('t_', 'd_', 'img_')):
-            del st.session_state[k]
-    
+    # 3. On force le redémarrage pour que Streamlit crée les cases vides
+    # puis les remplisse avec les données ci-dessus  
     st.rerun()
 
 # --- INTERFACE PRINCIPALE ---
