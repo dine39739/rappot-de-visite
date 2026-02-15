@@ -60,20 +60,20 @@ def generate_pdf():
     pdf.add_page()
     pdf.set_font("helvetica", 'B', 16)
     
-    # Titre
+    # --- Titre ---
     pdf.set_fill_color(0, 51, 102)
     pdf.set_text_color(255, 255, 255)
     pdf.cell(0, 15, f"RAPPORT : {st.session_state.client_name.upper()}", ln=True, align='C', fill=True)
     
-    # Infos
+    # --- Infos ---
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("helvetica", '', 10)
     pdf.ln(5)
     pdf.cell(0, 7, f"Client : {st.session_state.client_name}", ln=True)
     pdf.cell(0, 7, f"Adresse : {st.session_state.adresse}", ln=True)
-    pdf.cell(0, 7, f"Date : {date.today()} | Technicien : {st.session_state.technicien}", ln=True)
+    pdf.cell(0, 7, f"Technicien : {st.session_state.technicien}", ln=True)
     
-    # Participants (Intervenants)
+    # --- Participants ---
     if st.session_state.participants:
         pdf.ln(5)
         pdf.set_font("helvetica", 'B', 12)
@@ -82,27 +82,47 @@ def generate_pdf():
         for p in st.session_state.participants:
             pdf.cell(0, 7, f"- {p['nom']} (Tel: {p['tel']} | Email: {p['email']})", ln=True)
 
-    # Sections
-    for sec in st.session_state.sections:
+    # --- Sections et Photos ---
+    for idx, sec in enumerate(st.session_state.sections):
         pdf.ln(10)
         pdf.set_font("helvetica", 'B', 14)
         pdf.set_text_color(0, 51, 102)
         pdf.cell(0, 10, sec.get('titre', 'Sans titre').upper(), ln=True)
+        
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("helvetica", '', 11)
         pdf.multi_cell(0, 7, sec.get('description', ''))
         
+        # Gestion des photos
         if sec.get('photos'):
-            for img_file in sec['photos']:
+            for i, img_file in enumerate(sec['photos']):
                 try:
-                    img = Image.open(io.BytesIO(img_file.getvalue()))
-                    if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-                    temp = f"temp_{img_file.name}"
-                    img.save(temp)
-                    if pdf.get_y() > 200: pdf.add_page()
-                    pdf.image(temp, w=80)
-                    os.remove(temp)
-                except: continue
+                    # On crée un flux à partir des données de l'image
+                    img_data = io.BytesIO(img_file.getvalue())
+                    img = Image.open(img_data)
+                    
+                    # Conversion pour éviter les erreurs de transparence
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                    
+                    # Sauvegarde temporaire car FPDF lit depuis le disque
+                    temp_filename = f"temp_img_{idx}_{i}.jpg"
+                    img.save(temp_filename, "JPEG")
+                    
+                    # Saut de page intelligent
+                    if pdf.get_y() > 220:
+                        pdf.add_page()
+                    
+                    # Insertion de l'image (largeur 100mm)
+                    pdf.image(temp_filename, w=100)
+                    pdf.ln(5)
+                    
+                    # Nettoyage du fichier temporaire
+                    os.remove(temp_filename)
+                except Exception as e:
+                    st.error(f"Erreur d'insertion d'image : {e}")
+                    continue
+    
     return pdf.output()
 
 # --- GÉNÉRATION WORD ---
