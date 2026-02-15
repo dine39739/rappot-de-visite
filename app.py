@@ -350,15 +350,7 @@ st.subheader("🏁 Finaliser le Rapport")
 
 col_pdf, col_word = st.columns(2)
 
-with col_pdf:
-    if st.button("📄 Préparer le PDF"):
-        pdf_content = generate_pdf()
-        st.download_button(
-            label="⬇️ Télécharger PDF",
-            data=pdf_content,
-            file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.pdf",
-            mime="application/pdf"
-        )
+
 
 with col_word:
     if st.button("📝 Préparer le fichier Word"):
