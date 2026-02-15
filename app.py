@@ -170,8 +170,22 @@ c_pdf, c_word = st.columns(2)
 
 with c_pdf:
     if st.button("📄 Générer PDF"):
-        pdf_bytes = generate_pdf()
-        st.download_button("⬇️ Télécharger PDF", pdf_bytes, f"Rapport_{st.session_state.client_name}.pdf", "application/pdf")
+        pdf_content = generate_pdf()
+        
+        # Correction : On s'assure que les données sont au format bytes
+        if isinstance(pdf_content, str):
+            # Si c'est une chaîne (latin-1), on l'encode
+            pdf_final = pdf_content.encode('latin-1')
+        else:
+            # Sinon on force la conversion en bytes
+            pdf_final = bytes(pdf_content)
+            
+        st.download_button(
+            label="⬇️ Télécharger PDF",
+            data=pdf_final,
+            file_name=f"Rapport_{st.session_state.client_name}.pdf",
+            mime="application/pdf"
+        )
 
 with c_word:
     if st.button("📝 Générer Word"):
