@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import date
+from datetime import date, datetime
 from fpdf import FPDF
 from PIL import Image
 import os
@@ -7,7 +7,7 @@ import io
 import json
 import base64
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # --- CONFIGURATION ---
@@ -24,8 +24,10 @@ if 'adresse' not in st.session_state:
     st.session_state.adresse = ""
 if 'technicien' not in st.session_state:
     st.session_state.technicien = ""
+if 'date_intervention' not in st.session_state:
+    st.session_state.date_intervention = date.today()
 
-# --- FONCTIONS SAUVEGARDE ---
+# --- FONCTIONS SAUVEGARDE (BASE64) ---
 def images_to_base64(sections):
     sections_copy = []
     for s in sections:
@@ -60,20 +62,18 @@ def generate_pdf():
     pdf.add_page()
     pdf.set_font("helvetica", 'B', 16)
     
-    # --- Titre ---
     pdf.set_fill_color(0, 51, 102)
     pdf.set_text_color(255, 255, 255)
     pdf.cell(0, 15, f"RAPPORT : {st.session_state.client_name.upper()}", ln=True, align='C', fill=True)
     
-    # --- Infos ---
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("helvetica", '', 10)
     pdf.ln(5)
     pdf.cell(0, 7, f"Client : {st.session_state.client_name}", ln=True)
     pdf.cell(0, 7, f"Adresse : {st.session_state.adresse}", ln=True)
+    pdf.cell(0, 7, f"Date d'intervention : {st.session_state.date_intervention}", ln=True)
     pdf.cell(0, 7, f"Technicien : {st.session_state.technicien}", ln=True)
     
-    # --- Participants ---
     if st.session_state.participants:
         pdf.ln(5)
         pdf.set_font("helvetica", 'B', 12)
@@ -82,54 +82,33 @@ def generate_pdf():
         for p in st.session_state.participants:
             pdf.cell(0, 7, f"- {p['nom']} (Tel: {p['tel']} | Email: {p['email']})", ln=True)
 
-    # --- Sections et Photos ---
     for idx, sec in enumerate(st.session_state.sections):
         pdf.ln(10)
         pdf.set_font("helvetica", 'B', 14)
         pdf.set_text_color(0, 51, 102)
         pdf.cell(0, 10, sec.get('titre', 'Sans titre').upper(), ln=True)
-        
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("helvetica", '', 11)
         pdf.multi_cell(0, 7, sec.get('description', ''))
         
-        # Gestion des photos
         if sec.get('photos'):
             for i, img_file in enumerate(sec['photos']):
                 try:
-                    # On crée un flux à partir des données de l'image
-                    img_data = io.BytesIO(img_file.getvalue())
-                    img = Image.open(img_data)
-                    
-                    # Conversion pour éviter les erreurs de transparence
-                    if img.mode in ("RGBA", "P"):
-                        img = img.convert("RGB")
-                    
-                    # Sauvegarde temporaire car FPDF lit depuis le disque
-                    temp_filename = f"temp_img_{idx}_{i}.jpg"
-                    img.save(temp_filename, "JPEG")
-                    
-                    # Saut de page intelligent
-                    if pdf.get_y() > 220:
-                        pdf.add_page()
-                    
-                    # Insertion de l'image (largeur 100mm)
-                    pdf.image(temp_filename, w=100)
-                    pdf.ln(5)
-                    
-                    # Nettoyage du fichier temporaire
-                    os.remove(temp_filename)
-                except Exception as e:
-                    st.error(f"Erreur d'insertion d'image : {e}")
-                    continue
-    
+                    img = Image.open(io.BytesIO(img_file.getvalue()))
+                    if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+                    temp = f"temp_img_{idx}_{i}.jpg"
+                    img.save(temp, "JPEG")
+                    if pdf.get_y() > 220: pdf.add_page()
+                    pdf.image(temp, w=100)
+                    os.remove(temp)
+                except: continue
     return pdf.output()
 
 # --- GÉNÉRATION WORD ---
 def generate_word():
     doc = Document()
-    doc.add_heading(f"RAPPORT : {st.session_state.client_name}", 0)
-    doc.add_paragraph(f"Client : {st.session_state.client_name}\nTechnicien : {st.session_state.technicien}")
+    doc.add_heading(f"RAPPORT : {st.session_state.client_name}", 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph(f"Client : {st.session_state.client_name}\nAdresse : {st.session_state.adresse}\nDate d'intervention : {st.session_state.date_intervention}\nTechnicien : {st.session_state.technicien}")
     
     if st.session_state.participants:
         doc.add_heading("Participants", level=1)
@@ -141,36 +120,47 @@ def generate_word():
         doc.add_paragraph(s.get('description', ''))
         if s.get('photos'):
             for img_file in s['photos']:
-                try: doc.add_picture(io.BytesIO(img_file.getvalue()), width=Inches(3.0))
+                try: doc.add_picture(io.BytesIO(img_file.getvalue()), width=Inches(3.5))
                 except: continue
+    
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
-# --- SIDEBAR ---
+# --- SIDEBAR (SAUVEGARDE/CHARGEMENT) ---
 st.sidebar.header("💾 Brouillon")
 save_data = {
-    "client_name": st.session_state.client_name, "adresse": st.session_state.adresse,
-    "technicien": st.session_state.technicien, "participants": st.session_state.participants,
+    "client_name": st.session_state.client_name,
+    "adresse": st.session_state.adresse,
+    "technicien": st.session_state.technicien,
+    "date_intervention": str(st.session_state.date_intervention), # Conversion en texte pour JSON
+    "participants": st.session_state.participants,
     "sections": images_to_base64(st.session_state.sections)
 }
 st.sidebar.download_button("📥 Sauvegarder", json.dumps(save_data), f"brouillon.json")
+
 uploaded = st.sidebar.file_uploader("📂 Charger", type="json")
 if uploaded and st.sidebar.button("♻️ Restaurer"):
     d = json.load(uploaded)
-    st.session_state.update({"client_name": d['client_name'], "adresse": d['adresse'], "technicien": d['technicien'], 
-                             "participants": d['participants'], "sections": base64_to_images(d['sections'])})
+    # Conversion inverse de la date
+    restored_date = datetime.strptime(d.get("date_intervention", str(date.today())), "%Y-%m-%d").date()
+    st.session_state.update({
+        "client_name": d['client_name'], "adresse": d['adresse'], "technicien": d['technicien'], 
+        "date_intervention": restored_date, "participants": d['participants'], 
+        "sections": base64_to_images(d['sections'])
+    })
     st.rerun()
 
 # --- INTERFACE ---
 with st.expander("📌 Infos Chantier", expanded=True):
     col1, col2 = st.columns(2)
-    st.session_state.client_name = col1.text_input("Client", st.session_state.client_name)
-    st.session_state.adresse = col1.text_input("Adresse", st.session_state.adresse)
-    st.session_state.technicien = col2.text_input("Technicien", st.session_state.technicien)
+    st.session_state.client_name = col1.text_input("Nom du Client / Projet", st.session_state.client_name)
+    st.session_state.adresse = col1.text_input("Adresse de l'intervention", st.session_state.adresse)
+    # AJOUT DU CHAMP DATE
+    st.session_state.date_intervention = col2.date_input("Date d'intervention", st.session_state.date_intervention)
+    st.session_state.technicien = col2.text_input("Technicien responsable", st.session_state.technicien)
 
-# --- RE-AJOUT DE LA SECTION PARTICIPANTS ---
 st.header("👥 Intervenants / Participants")
 if st.button("➕ Ajouter un intervenant"):
     st.session_state.participants.append({"nom": "", "tel": "", "email": ""})
@@ -187,11 +177,11 @@ for i, p in enumerate(st.session_state.participants):
 st.header("📝 Corps du Rapport")
 for i, sec in enumerate(st.session_state.sections):
     with st.container():
-        sec['titre'] = st.text_input(f"Titre S{i+1}", sec['titre'], key=f"t{i}")
-        sec['description'] = st.text_area(f"Observations S{i+1}", sec['description'], key=f"d{i}")
+        sec['titre'] = st.text_input(f"Titre Section {i+1}", sec['titre'], key=f"t{i}")
+        sec['description'] = st.text_area(f"Observations Section {i+1}", sec['description'], key=f"d{i}")
         if sec.get('photos'): st.info(f"📸 {len(sec['photos'])} photo(s) chargée(s)")
-        sec['photos'] = st.file_uploader(f"Photos S{i+1}", accept_multiple_files=True, type=['jpg','png'], key=f"img{i}")
-        if st.button(f"🗑️ Supprimer S{i+1}", key=f"del{i}"):
+        sec['photos'] = st.file_uploader(f"Ajouter photos S{i+1}", accept_multiple_files=True, type=['jpg','png'], key=f"img{i}")
+        if st.button(f"🗑️ Supprimer Section {i+1}", key=f"del{i}"):
             st.session_state.sections.pop(i)
             st.rerun()
         st.divider()
@@ -206,7 +196,8 @@ c1, c2 = st.columns(2)
 with c1:
     if st.button("📄 Générer PDF"):
         res = generate_pdf()
-        st.download_button("⬇️ Télécharger PDF", bytes(res) if not isinstance(res, str) else res.encode('latin-1'), "rapport.pdf", "application/pdf")
+        st.download_button("⬇️ Télécharger PDF", bytes(res) if not isinstance(res, str) else res.encode('latin-1'), f"Rapport_{st.session_state.client_name}.pdf", "application/pdf")
 with c2:
     if st.button("📝 Générer Word"):
-        st.download_button("⬇️ Télécharger Word", generate_word().getvalue(), "rapport.docx")
+        word_buf = generate_word()
+        st.download_button("⬇️ Télécharger Word", word_buf.getvalue(), f"Rapport_{st.session_state.client_name}.docx")
