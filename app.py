@@ -103,4 +103,4 @@ def generate_word():
                     continue
                     
     buffer = io.BytesIO()
-    doc.save(buffer)
+    doc.save(buffer
