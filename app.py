@@ -1,59 +1,83 @@
 import streamlit as st
-from datetime import date, datetime
+from datetime import date
 from fpdf import FPDF
 from PIL import Image
 import os
 import io
-import json
-import base64
 from docx import Document
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH  # <--- Indispensable pour l'alignement
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
 
-# --- INITIALISATION ---
+# --- INITIALISATION DES VARIABLES (SESSION STATE) ---
 if 'participants' not in st.session_state:
     st.session_state.participants = []
 if 'sections' not in st.session_state:
     st.session_state.sections = [{'titre': '', 'description': '', 'photos': []}]
 
-# Initialisation des infos générales
-for key in ['cli_val', 'adr_val', 'tec_val']:
-    if key not in st.session_state: st.session_state[key] = ""
-if 'date_val' not in st.session_state: st.session_state['date_val'] = date.today()
+# --- STYLE CSS POUR LE RENDU ---
+st.markdown("""
+    <style>
+    .main { background-color: #f5f7f9; }
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; }
+    .section-container { border: 1px solid #ddd; padding: 20px; border-radius: 10px; margin-bottom: 20px; background-color: white; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- FONCTIONS DE CONVERSION ---
-def images_to_base64(sections):
-    sections_copy = []
-    for s in sections:
-        new_sec = s.copy()
-        if s.get('photos'):
-            photos_data = []
-            for img in s['photos']:
-                try:
-                    img_bytes = img.getvalue() if hasattr(img, 'getvalue') else img.read()
-                    encoded = base64.b64encode(img_bytes).decode()
-                    photos_data.append({"name": getattr(img, 'name', 'photo.jpg'), "content": encoded})
-                except: continue
-            new_sec['photos_base64'] = photos_data
-        if 'photos' in new_sec: del new_sec['photos']
-        sections_copy.append(new_sec)
-    return sections_copy
+st.title("🏗️ Générateur de Rapport Technique")
+st.info("Remplissez les sections ci-dessous. Vous pouvez ajouter autant de participants et de sections que nécessaire.")
 
-def base64_to_images(sections_data):
-    for s in sections_data:
-        if s.get('photos_base64'):
-            restored = []
-            for p in s['photos_base64']:
-                try:
-                    buf = io.BytesIO(base64.b64decode(p['content']))
-                    buf.name = p['name']
-                    restored.append(buf)
-                except: continue
-            s['photos'] = restored
-    return sections_data
+# --- ÉTAPE 1 : INFOS GÉNÉRALES ---
+with st.expander("📌 Informations du Chantier", expanded=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        client_name = st.text_input("Nom du Client / Projet", placeholder="ex: Résidence Les Palmiers")
+        adresse = st.text_input("Adresse de l'intervention")
+    with col2:
+        date_visite = st.date_input("Date de la visite", date.today())
+        technicien = st.text_input("Technicien responsable")
 
-# --- GÉNÉRATION PDF ---
+# --- ÉTAPE 2 : PARTICIPANTS ---
+st.header("👥 Participants")
+if st.button("➕ Ajouter un participant"):
+    st.session_state.participants.append({"nom": "", "tel": "", "email": ""})
+
+for i, p in enumerate(st.session_state.participants):
+    with st.container():
+        c1, c2, c3, c4 = st.columns([3, 2, 3, 1])
+        p['nom'] = c1.text_input(f"Nom & Prénom", value=p['nom'], key=f"p_nom_{i}")
+        p['tel'] = c2.text_input(f"Téléphone", value=p['tel'], key=f"p_tel_{i}")
+        p['email'] = c3.text_input(f"Email", value=p['email'], key=f"p_email_{i}")
+        if c4.button("🗑️", key=f"del_p_{i}"):
+            st.session_state.participants.pop(i)
+            st.rerun()
+
+# --- ÉTAPE 3 : SECTIONS DU RAPPORT ---
+st.header("📝 Corps du Rapport")
+
+for idx, sec in enumerate(st.session_state.sections):
+    with st.container():
+        st.markdown(f"**Section {idx + 1}**")
+        sec['titre'] = st.text_input("Titre de la section", value=sec['titre'], key=f"sec_titre_{idx}", placeholder="ex: Constatations en toiture")
+        sec['description'] = st.text_area("Observations détaillées", value=sec['description'], key=f"sec_desc_{idx}")
+        
+        # Gestion des photos pour cette section
+        sec['photos'] = st.file_uploader(f"Ajouter des photos (Section {idx+1})", 
+                                         accept_multiple_files=True, 
+                                         type=['png', 'jpg', 'jpeg'], 
+                                         key=f"sec_img_{idx}")
+        
+        if len(st.session_state.sections) > 1:
+            if st.button(f"❌ Supprimer la section {idx+1}", key=f"del_sec_{idx}"):
+                st.session_state.sections.pop(idx)
+                st.rerun()
+        st.divider()
+
+if st.button("➕ Ajouter une Section de travail"):
+    st.session_state.sections.append({'titre': '', 'description': '', 'photos': []})
+
 # --- FONCTION DE GÉNÉRATION PDF ---
 def generate_pdf():
     pdf = FPDF()
@@ -163,51 +187,244 @@ if st.button("🚀 GÉNÉRER LE RAPPORT PDF"):
                 mime="application/pdf"
             )
 
+# --- PROCHAINE ÉTAPE : GOOGLE DRIVE ---
+# Note : Pour lier à Drive, il faudra configurer les "Secrets" dans Streamlit Cloud.
 
-# --- SIDEBAR : SAUVEGARDE & RESTAURATION ---
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+
+# --- CONFIGURATION DRIVE ---
+# Remplacez par l'ID de votre dossier Drive (il est dans l'URL de votre dossier)
+FOLDER_ID = "1izwpTbS9x5fUI2a0UWQVWmlG3XcKNEDn" 
+
+def upload_to_drive(pdf_bytes, filename):
+    try:
+        info = st.secrets["gcp_service_account"]
+        creds = service_account.Credentials.from_service_account_info(info)
+        service = build('drive', 'v3', credentials=creds)
+
+        # Configuration du fichier
+        file_metadata = {
+            'name': filename,
+            'parents': [FOLDER_ID]
+        }
+        
+        fh = io.BytesIO(pdf_bytes)
+        media = MediaIoBaseUpload(fh, mimetype='application/pdf')
+
+        # L'ASTUCE : On force le fichier à ne pas utiliser le quota du robot
+        # En partageant le dossier avec le robot en tant qu'éditeur, 
+        # le fichier hérite de la propriété du dossier parent (le vôtre).
+        file = service.files().create(
+            body=file_metadata, 
+            media_body=media, 
+            fields='id',
+            supportsAllDrives=True # Important pour la gestion des quotas
+        ).execute()
+        
+        return file.get('id')
+    except Exception as e:
+        st.error(f"Erreur Drive : {e}")
+        return None
+
+import json
+
+# Préparation des données
+donnees_brouillon = {
+    "client": client_name,
+    "adresse": adresse,
+    "technicien": technicien,
+    "participants": st.session_state.participants,
+    "sections": [{"titre": s["titre"], "description": s["description"]} for s in st.session_state.sections]
+}
+
+# Conversion en texte
+json_string = json.dumps(donnees_brouillon, indent=4)
+
+st.sidebar.header("💾 Persistance locale")
+st.sidebar.download_button(
+    label="📥 Sauvegarder l'état actuel",
+    data=json_string,
+    file_name=f"brouillon_{client_name}.json",
+    mime="application/json",
+    help="Télécharge un petit fichier qui contient tout votre texte actuel."
+)
+# --- DANS VOTRE BOUTON DE GÉNÉRATION FINAL ---
+
+if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
+    if not client_name:
+        st.error("Veuillez saisir le nom du client.")
+    else:
+        with st.spinner("Génération du PDF et synchronisation Drive..."):
+            pdf_data = generate_pdf()
+            pdf_bytes = bytes(pdf_data)
+            
+            # 1. Sauvegarde sur Drive
+            filename = f"Rapport_{client_name}_{date_visite}.pdf"
+            file_id = upload_to_drive(pdf_bytes, filename)
+            
+            if file_id: "1izwpTbS9x5fUI2a0UWQVWmlG3XcKNEDn"
+            st.success(f"✅ Rapport sauvegardé sur Google Drive !")
+            
+            # 2. Proposer quand même le téléchargement local
+            st.download_button(
+                label="⬇️ Télécharger une copie locale",
+                data=pdf_bytes,
+                file_name=filename,
+                mime="application/pdf"
+            )
+
+import urllib.parse
+
+# Préparation du lien mailto
+sujet = f"Rapport d'intervention : {client_name}"
+corps = f"Bonjour,\n\nVeuillez trouver ci-joint le rapport pour l'intervention du {date_visite}.\n\nCordialement,"
+# Encodage pour les espaces et caractères spéciaux
+mail_link = f"mailto:?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps)}"
+
+st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; height:3em; background-color:#0078d4; color:white; border:none; border-radius:5px;">📧 Ouvrir dans Outlook</button></a>', unsafe_allow_html=True)
+
+
+# --- FONCTION GÉNÉRATION WORD ---
+def generate_word():
+    doc = Document()
+    
+    # 1. Récupération sécurisée des variables
+    nom_client = st.session_state.get('client_name', 'Client Inconnu').upper()
+    nom_tech = st.session_state.get('technicien', 'Non renseigné')
+    visite_date = str(st.session_state.get('date_visite', ''))
+    lieu = st.session_state.get('adresse', 'Non renseignée')
+    
+    # 2. Titre Principal
+    title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # 3. En-tête Infos
+    p = doc.add_paragraph()
+    p.add_run("Date de la visite : ").bold = True
+    p.add_run(f"{visite_date}\n")
+    p.add_run("Technicien : ").bold = True
+    p.add_run(f"{nom_tech}\n")
+    p.add_run("Adresse : ").bold = True
+    p.add_run(f"{lieu}")
+
+    # 4. Participants
+    doc.add_heading("Participants", level=1)
+    parts = st.session_state.get('participants', [])
+    if isinstance(parts, list):
+        for part in parts:
+            if isinstance(part, dict):
+                nom_p = part.get('nom', '')
+                soc_p = part.get('societe', '')
+                doc.add_paragraph(f"• {nom_p} ({soc_p})", style='List Bullet')
+
+    # 5. Sections et Photos
+    doc.add_heading("Constats et Photos", level=1)
+    sections = st.session_state.get('sections', [])
+    
+    for s in sections:
+        doc.add_heading(s.get('titre', 'Sans titre'), level=2)
+        doc.add_paragraph(s.get('description', ''))
+        
+        if s.get('image') is not None:
+            try:
+                image_bytes = s['image'].getvalue()
+                image_stream = io.BytesIO(image_bytes)
+                doc.add_picture(image_stream, width=Inches(4.0))
+                doc.add_paragraph() 
+            except Exception as e:
+                p_err = doc.add_paragraph()
+                p_err.add_run(f"[Image non insérée : {e}]").italic = True
+
+    # --- ATTENTION : CES LIGNES DOIVENT ÊTRE DÉCALÉES DE 4 ESPACES ---
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer 
+
+# --- SECTION EXPORT FINAL (INTERFACE) ---
+# Ici on revient tout à gauche car on sort de la fonction
+st.divider()
+st.subheader("🏁 Finaliser le Rapport")
+
+col_pdf, col_word = st.columns(2)
+
+with col_pdf:
+    if st.button("📄 Préparer le PDF"):
+        pdf_content = generate_pdf()
+        st.download_button(
+            label="⬇️ Télécharger PDF",
+            data=pdf_content,
+            file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.pdf",
+            mime="application/pdf"
+        )
+
+with col_word:
+    if st.button("📝 Préparer le fichier Word"):
+        word_buffer = generate_word() 
+        if word_buffer:
+            word_data = word_buffer.getvalue() 
+            st.download_button(
+                label="⬇️ Cliquer pour télécharger (.docx)",
+                data=word_data,
+                file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+    
+# --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
+
+# --- SIDEBAR : SAUVEGARDE ET RESTAURATION ---
 st.sidebar.header("💾 Gestion du Dossier")
 
-save_dict = {
+save_data = {
     "client_name": st.session_state.cli_val,
     "adresse": st.session_state.adr_val,
     "technicien": st.session_state.tec_val,
-    "date_intervention": str(st.session_state.date_val),
+    "date_visite": str(st.session_state.date_val),
     "participants": st.session_state.participants,
     "sections": images_to_base64(st.session_state.sections)
 }
-st.sidebar.download_button("📥 Sauvegarder JSON", json.dumps(save_dict, indent=4), "sauvegarde.json")
+st.sidebar.download_button("📥 Télécharger JSON", json.dumps(save_data, indent=4), "sauvegarde.json")
 
-uploaded = st.sidebar.file_uploader("📂 Charger JSON", type=["json"])
+uploaded = st.sidebar.file_uploader("📂 Charger un fichier JSON", type=["json"])
 
 if uploaded and st.sidebar.button("♻️ RESTAURER LES DONNÉES"):
     data = json.load(uploaded)
     
-    # NETTOYAGE DES CLÉS (Pour forcer la Section 1 à se mettre à jour)
-    for key in list(st.session_state.keys()):
-        if key.startswith(('t_', 'd_', 'cli_val', 'adr_val', 'tec_val', 'pnom_', 'ptel_', 'pmail_')):
-            del st.session_state[key]
-            
-    # INJECTION DES DONNÉES
+    # Mise à jour des infos fixes
     st.session_state.cli_val = data.get("client_name", "")
     st.session_state.adr_val = data.get("adresse", "")
     st.session_state.tec_val = data.get("technicien", "")
     try:
-        st.session_state.date_val = datetime.strptime(data.get("date_intervention"), "%Y-%m-%d").date()
+        st.session_state.date_val = datetime.strptime(data.get("date_visite"), "%Y-%m-%d").date()
     except:
         st.session_state.date_val = date.today()
+    
     st.session_state.participants = data.get("participants", [])
-    st.session_state.sections = base64_to_images(data.get("sections", []))
+    
+    # Mise à jour des sections (Toiture, etc.)
+    # On reconstruit les images base64 -> BytesIO
+    restored_sections = base64_to_images(data.get("sections", []))
+    st.session_state.sections = restored_sections
+
+    # TRÈS IMPORTANT : On efface les clés de widgets des sections pour forcer Streamlit 
+    # à relire les données depuis st.session_state.sections
+    for k in list(st.session_state.keys()):
+        if k.startswith(('t_', 'd_', 'img_')):
+            del st.session_state[k]
     
     st.rerun()
 
-# --- INTERFACE ---
+# --- INTERFACE PRINCIPALE ---
 st.title("🏗️ Tech-Report Pro")
 
-with st.expander("📌 Informations Chantier", expanded=True):
-    st.text_input("Client", key="cli_val")
-    st.text_input("Adresse", key="adr_val")
-    st.text_input("Technicien", key="tec_val")
-    st.date_input("Date", key="date_val")
+with st.expander("📌 Informations du Chantier", expanded=True):
+    col1, col2 = st.columns(2)
+    st.text_input("Nom du Client / Projet", key="cli_val")
+    st.text_input("Adresse de l'intervention", key="adr_val")
+    st.text_input("Technicien responsable", key="tec_val")
+    st.date_input("Date de la visite", key="date_val")
 
 st.header("👥 Participants")
 if st.button("➕ Ajouter un participant"):
@@ -225,13 +442,13 @@ for i, p in enumerate(st.session_state.participants):
 
 st.header("📝 Corps du Rapport")
 
-
-
+# BOUCLE DES SECTIONS
 for idx, sec in enumerate(st.session_state.sections):
     with st.container():
         st.subheader(f"Section {idx+1}")
         
-        # Le titre et la description sont liés aux données de st.session_state.sections
+        # On utilise value=sec.get(...) ET on met à jour la liste en direct
+        # L'utilisation de value assure que même si la clé change, le texte reste
         st.session_state.sections[idx]['titre'] = st.text_input(
             f"Titre Section {idx+1}", 
             value=sec.get('titre', ''), 
@@ -241,13 +458,14 @@ for idx, sec in enumerate(st.session_state.sections):
         st.session_state.sections[idx]['description'] = st.text_area(
             f"Observations Section {idx+1}", 
             value=sec.get('description', ''), 
-            key=f"d_{idx}"
+            key=f"d_{idx}",
+            height=200
         )
         
         if sec.get('photos'):
-            st.info(f"📸 {len(sec['photos'])} photo(s) chargée(s)")
+            st.success(f"📸 {len(sec['photos'])} photo(s) chargée(s) pour cette section.")
         
-        new_imgs = st.file_uploader(f"Photos S{idx+1}", accept_multiple_files=True, key=f"img_{idx}")
+        new_imgs = st.file_uploader(f"Ajouter/Remplacer photos S{idx+1}", accept_multiple_files=True, key=f"img_{idx}")
         if new_imgs:
             st.session_state.sections[idx]['photos'] = new_imgs
             
@@ -260,6 +478,7 @@ if st.button("➕ Ajouter une Section"):
     st.session_state.sections.append({'titre': '', 'description': '', 'photos': []})
     st.rerun()
 
+# EXPORT
 if st.button("📄 Générer le Rapport PDF"):
     pdf_res = generate_pdf()
     st.download_button("⬇️ Télécharger PDF", bytes(pdf_res) if not isinstance(pdf_res, str) else pdf_res.encode('latin-1'), f"Rapport_{st.session_state.cli_val}.pdf", "application/pdf")
