@@ -4,40 +4,113 @@ from fpdf import FPDF
 from PIL import Image
 import os
 import io
+import json
+import base64
 from docx import Document
 from docx.shared import Inches, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH  # <--- Indispensable pour l'alignement
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Tech-Report Pro", layout="wide", page_icon="🏗️")
 
-# --- INITIALISATION DES VARIABLES (SESSION STATE) ---
+# --- INITIALISATION DU SESSION STATE ---
 if 'participants' not in st.session_state:
     st.session_state.participants = []
 if 'sections' not in st.session_state:
     st.session_state.sections = [{'titre': '', 'description': '', 'photos': []}]
+if 'client_name' not in st.session_state:
+    st.session_state.client_name = ""
+if 'adresse' not in st.session_state:
+    st.session_state.adresse = ""
+if 'technicien' not in st.session_state:
+    st.session_state.technicien = ""
 
-# --- STYLE CSS POUR LE RENDU ---
+# --- FONCTIONS UTILITAIRES POUR LA SAUVEGARDE (BASE64) ---
+def images_to_base64(sections):
+    """Convertit les fichiers UploadedFile en texte pour le JSON."""
+    sections_copy = []
+    for s in sections:
+        new_sec = s.copy()
+        if s.get('photos'):
+            photos_data = []
+            for img in s['photos']:
+                try:
+                    encoded = base64.b64encode(img.getvalue()).decode()
+                    photos_data.append({"name": img.name, "type": img.type, "content": encoded})
+                except:
+                    continue
+            new_sec['photos_base64'] = photos_data
+        # On ne peut pas sérialiser les objets UploadedFile, on les retire de la copie
+        if 'photos' in new_sec:
+            del new_sec['photos']
+        sections_copy.append(new_sec)
+    return sections_copy
+
+def base64_to_images(sections_data):
+    """Convertit le texte Base64 du JSON en flux binaires exploitables."""
+    for s in sections_data:
+        if s.get('photos_base64'):
+            restored_photos = []
+            for p_data in s['photos_base64']:
+                img_bytes = base64.b64decode(p_data['content'])
+                buf = io.BytesIO(img_bytes)
+                buf.name = p_data['name'] # Reconstruit l'attribut name
+                restored_photos.append(buf)
+            s['photos'] = restored_photos
+    return sections_data
+
+# --- STYLE CSS ---
 st.markdown("""
     <style>
     .main { background-color: #f5f7f9; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; }
-    .section-container { border: 1px solid #ddd; padding: 20px; border-radius: 10px; margin-bottom: 20px; background-color: white; }
+    .stButton>button { width: 100%; border-radius: 5px; }
+    .section-container { border: 1px solid #ddd; padding: 20px; border-radius: 10px; background-color: white; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🏗️ Générateur de Rapport Technique")
-st.info("Remplissez les sections ci-dessous. Vous pouvez ajouter autant de participants et de sections que nécessaire.")
+
+# --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION ---
+st.sidebar.header("💾 Gestion du Brouillon")
+
+# Préparation des données de sauvegarde
+data_to_save = {
+    "client_name": st.session_state.client_name,
+    "adresse": st.session_state.adresse,
+    "technicien": st.session_state.technicien,
+    "participants": st.session_state.participants,
+    "sections": images_to_base64(st.session_state.sections)
+}
+
+st.sidebar.download_button(
+    label="📥 Télécharger la sauvegarde (.json)",
+    data=json.dumps(data_to_save, indent=4),
+    file_name=f"sauvegarde_{st.session_state.client_name or 'rapport'}.json",
+    mime="application/json"
+)
+
+st.sidebar.divider()
+uploaded_brouillon = st.sidebar.file_uploader("📂 Charger un brouillon", type=["json"])
+
+if uploaded_brouillon:
+    if st.sidebar.button("♻️ Restaurer les données"):
+        data = json.load(uploaded_brouillon)
+        st.session_state.client_name = data.get("client_name", "")
+        st.session_state.adresse = data.get("adresse", "")
+        st.session_state.technicien = data.get("technicien", "")
+        st.session_state.participants = data.get("participants", [])
+        st.session_state.sections = base64_to_images(data.get("sections", []))
+        st.rerun()
 
 # --- ÉTAPE 1 : INFOS GÉNÉRALES ---
 with st.expander("📌 Informations du Chantier", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
-        client_name = st.text_input("Nom du Client / Projet", placeholder="ex: Résidence Les Palmiers")
-        adresse = st.text_input("Adresse de l'intervention")
+        st.session_state.client_name = st.text_input("Nom du Client / Projet", value=st.session_state.client_name)
+        st.session_state.adresse = st.text_input("Adresse de l'intervention", value=st.session_state.adresse)
     with col2:
         date_visite = st.date_input("Date de la visite", date.today())
-        technicien = st.text_input("Technicien responsable")
+        st.session_state.technicien = st.text_input("Technicien responsable", value=st.session_state.technicien)
 
 # --- ÉTAPE 2 : PARTICIPANTS ---
 st.header("👥 Participants")
@@ -45,332 +118,75 @@ if st.button("➕ Ajouter un participant"):
     st.session_state.participants.append({"nom": "", "tel": "", "email": ""})
 
 for i, p in enumerate(st.session_state.participants):
-    with st.container():
-        c1, c2, c3, c4 = st.columns([3, 2, 3, 1])
-        p['nom'] = c1.text_input(f"Nom & Prénom", value=p['nom'], key=f"p_nom_{i}")
-        p['tel'] = c2.text_input(f"Téléphone", value=p['tel'], key=f"p_tel_{i}")
-        p['email'] = c3.text_input(f"Email", value=p['email'], key=f"p_email_{i}")
-        if c4.button("🗑️", key=f"del_p_{i}"):
-            st.session_state.participants.pop(i)
-            st.rerun()
+    c1, c2, c3, c4 = st.columns([3, 2, 3, 1])
+    p['nom'] = c1.text_input(f"Nom & Prénom", value=p['nom'], key=f"p_nom_{i}")
+    p['tel'] = c2.text_input(f"Téléphone", value=p['tel'], key=f"p_tel_{i}")
+    p['email'] = c3.text_input(f"Email", value=p['email'], key=f"p_email_{i}")
+    if c4.button("🗑️", key=f"del_p_{i}"):
+        st.session_state.participants.pop(i)
+        st.rerun()
 
 # --- ÉTAPE 3 : SECTIONS DU RAPPORT ---
 st.header("📝 Corps du Rapport")
-
 for idx, sec in enumerate(st.session_state.sections):
     with st.container():
         st.markdown(f"**Section {idx + 1}**")
-        sec['titre'] = st.text_input("Titre de la section", value=sec['titre'], key=f"sec_titre_{idx}", placeholder="ex: Constatations en toiture")
-        sec['description'] = st.text_area("Observations détaillées", value=sec['description'], key=f"sec_desc_{idx}")
+        sec['titre'] = st.text_input("Titre", value=sec['titre'], key=f"sec_titre_{idx}")
+        sec['description'] = st.text_area("Observations", value=sec['description'], key=f"sec_desc_{idx}")
         
-        # Gestion des photos pour cette section
-        sec['photos'] = st.file_uploader(f"Ajouter des photos (Section {idx+1})", 
+        # Pour les photos restaurées, on affiche un indicateur car file_uploader ne peut pas être pré-rempli
+        if sec.get('photos'):
+            st.write(f"✅ {len(sec['photos'])} photo(s) chargée(s) pour cette section.")
+            
+        sec['photos'] = st.file_uploader(f"Ajouter/Remplacer photos (S{idx+1})", 
                                          accept_multiple_files=True, 
                                          type=['png', 'jpg', 'jpeg'], 
                                          key=f"sec_img_{idx}")
         
-        if len(st.session_state.sections) > 1:
-            if st.button(f"❌ Supprimer la section {idx+1}", key=f"del_sec_{idx}"):
-                st.session_state.sections.pop(idx)
-                st.rerun()
+        if st.button(f"❌ Supprimer la section {idx+1}", key=f"del_sec_{idx}"):
+            st.session_state.sections.pop(idx)
+            st.rerun()
         st.divider()
 
-if st.button("➕ Ajouter une Section de travail"):
+if st.button("➕ Ajouter une Section"):
     st.session_state.sections.append({'titre': '', 'description': '', 'photos': []})
 
-# --- FONCTION DE GÉNÉRATION PDF ---
-def generate_pdf():
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    
-    # --- 1. CHARGEMENT DE LA POLICE UNICODE ---
-    # Assurez-vous que le fichier .ttf est bien sur votre GitHub
-    pdf.add_font("DejaVu", '', 'DejaVuSans.ttf')
-    pdf.set_font("DejaVu", '', 12)
-
-    # --- 2. EN-TÊTE AVEC LOGO ---
-    # pdf.image(nom_du_fichier, x, y, largeur)
-    # Si le fichier logo.png existe, on l'affiche
-    if os.path.exists("logo.png"):
-        pdf.image("logo.png", x=10, y=8, w=30)
-    
-    pdf.ln(20) # Saut de ligne après le logo
-
-    # --- 3. TITRE ENCADRÉ (Bleu foncé, texte blanc) ---
-    # Couleurs RGB : Bleu foncé (0, 51, 102), Blanc (255, 255, 255)
-    pdf.set_fill_color(0, 51, 102)  # Couleur du fond de l'encadré
-    pdf.set_text_color(255, 255, 255) # Couleur du texte
-    pdf.set_font("DejaVu", '', 18)
-    
-    # Cell(largeur, hauteur, texte, bordure, retour ligne, alignement, remplissage)
-    pdf.cell(0, 15, "RAPPORT D'INTERVENTION TECHNIQUE", ln=True, align='C', fill=True)
-    
-    # --- 4. RÉINITIALISATION POUR LE RESTE DU TEXTE ---
-    pdf.set_text_color(0, 0, 0) # On repasse en noir
-    pdf.set_font("DejaVu", '', 11)
-    pdf.ln(5)
-    
-    # Infos générales (sous le titre)
-    pdf.set_font("helvetica", '', 10)
-    pdf.cell(0, 7, f"Client : {client_name}", ln=True)
-    pdf.cell(0, 7, f"Adresse : {adresse}", ln=True)
-    pdf.cell(0, 7, f"Date : {date_visite} | Technicien : {technicien}", ln=True)
-    pdf.ln(10)
-
-    # --- 5. SECTION PARTICIPANTS ---
-    if st.session_state.participants:
-        pdf.set_font("helvetica", '', 12)
-        pdf.set_fill_color(230, 230, 230) # Gris très clair
-        pdf.cell(0, 10, " PERSONNES PRÉSENTES", ln=True, fill=True)
-        pdf.set_font("DejaVu", '', 10)
-        for p in st.session_state.participants:
-            pdf.cell(0, 8, f"• {p['nom']} (Tél: {p['tel']} | Email: {p['email']})", ln=True)
-        pdf.ln(10)
-
-    # --- 6. CORPS DU RAPPORT ---
-    for sec in st.session_state.sections:
-        if sec['titre']:
-            # Titre de section stylisé (souligné bleu)
-            pdf.set_font("helvetica", '', 14)
-            pdf.set_text_color(0, 51, 102)
-            pdf.cell(0, 10, sec['titre'].upper(), ln=True)
-            pdf.set_draw_color(0, 51, 102)
-            pdf.line(pdf.get_x(), pdf.get_y(), pdf.get_x() + 190, pdf.get_y())
-            pdf.ln(2)
-            
-            # Description
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font("helvetica", '', 11)
-            pdf.multi_cell(0, 7, sec['description'])
-            pdf.ln(5)
-
-            # Photos
-            if sec['photos']:
-                # On organise les photos par 2 par ligne pour gagner de la place
-                col_width = 90
-                for i, img_file in enumerate(sec['photos']):
-                    try:
-                        img = Image.open(img_file)
-                        if img.mode in ("RGBA", "P"):
-                            img = img.convert("RGB")
-                        
-                        temp_path = f"temp_{idx}_{i}_{img_file.name}"
-                        img.save(temp_path)
-                        
-                        # Gestion de l'espace pour ne pas couper l'image en bas de page
-                        if pdf.get_y() > 220:
-                            pdf.add_page()
-                        
-                        pdf.image(temp_path, w=col_width)
-                        pdf.ln(5)
-                        os.remove(temp_path)
-                    except Exception as e:
-                        st.error(f"Erreur photo : {e}")
-            pdf.ln(10)
-
-    return pdf.output()
-
-# --- BOUTON FINAL ---
-st.divider()
-if st.button("🚀 GÉNÉRER LE RAPPORT PDF"):
-    if not client_name or not technicien:
-        st.warning("Veuillez remplir au moins le nom du client et du technicien.")
-    else:
-        with st.spinner("Création du PDF en cours..."):
-            pdf_data = generate_pdf()
-            st.success("✅ Votre rapport est prêt !")
-            st.download_button(
-                label="⬇️ Télécharger le Rapport (PDF)",
-                data=bytes(pdf_data),
-                file_name=f"Rapport_{client_name}_{date_visite}.pdf",
-                mime="application/pdf"
-            )
-
-# --- PROCHAINE ÉTAPE : GOOGLE DRIVE ---
-# Note : Pour lier à Drive, il faudra configurer les "Secrets" dans Streamlit Cloud.
-
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-
-# --- CONFIGURATION DRIVE ---
-# Remplacez par l'ID de votre dossier Drive (il est dans l'URL de votre dossier)
-FOLDER_ID = "1izwpTbS9x5fUI2a0UWQVWmlG3XcKNEDn" 
-
-def upload_to_drive(pdf_bytes, filename):
-    try:
-        info = st.secrets["gcp_service_account"]
-        creds = service_account.Credentials.from_service_account_info(info)
-        service = build('drive', 'v3', credentials=creds)
-
-        # Configuration du fichier
-        file_metadata = {
-            'name': filename,
-            'parents': [FOLDER_ID]
-        }
-        
-        fh = io.BytesIO(pdf_bytes)
-        media = MediaIoBaseUpload(fh, mimetype='application/pdf')
-
-        # L'ASTUCE : On force le fichier à ne pas utiliser le quota du robot
-        # En partageant le dossier avec le robot en tant qu'éditeur, 
-        # le fichier hérite de la propriété du dossier parent (le vôtre).
-        file = service.files().create(
-            body=file_metadata, 
-            media_body=media, 
-            fields='id',
-            supportsAllDrives=True # Important pour la gestion des quotas
-        ).execute()
-        
-        return file.get('id')
-    except Exception as e:
-        st.error(f"Erreur Drive : {e}")
-        return None
-
-import json
-
-# Préparation des données
-donnees_brouillon = {
-    "client": client_name,
-    "adresse": adresse,
-    "technicien": technicien,
-    "participants": st.session_state.participants,
-    "sections": [{"titre": s["titre"], "description": s["description"]} for s in st.session_state.sections]
-}
-
-# Conversion en texte
-json_string = json.dumps(donnees_brouillon, indent=4)
-
-st.sidebar.header("💾 Persistance locale")
-st.sidebar.download_button(
-    label="📥 Sauvegarder l'état actuel",
-    data=json_string,
-    file_name=f"brouillon_{client_name}.json",
-    mime="application/json",
-    help="Télécharge un petit fichier qui contient tout votre texte actuel."
-)
-# --- DANS VOTRE BOUTON DE GÉNÉRATION FINAL ---
-
-if st.button("🚀 GÉNÉRER ET ENVOYER LE RAPPORT"):
-    if not client_name:
-        st.error("Veuillez saisir le nom du client.")
-    else:
-        with st.spinner("Génération du PDF et synchronisation Drive..."):
-            pdf_data = generate_pdf()
-            pdf_bytes = bytes(pdf_data)
-            
-            # 1. Sauvegarde sur Drive
-            filename = f"Rapport_{client_name}_{date_visite}.pdf"
-            file_id = upload_to_drive(pdf_bytes, filename)
-            
-            if file_id: "1izwpTbS9x5fUI2a0UWQVWmlG3XcKNEDn"
-            st.success(f"✅ Rapport sauvegardé sur Google Drive !")
-            
-            # 2. Proposer quand même le téléchargement local
-            st.download_button(
-                label="⬇️ Télécharger une copie locale",
-                data=pdf_bytes,
-                file_name=filename,
-                mime="application/pdf"
-            )
-
-import urllib.parse
-
-# Préparation du lien mailto
-sujet = f"Rapport d'intervention : {client_name}"
-corps = f"Bonjour,\n\nVeuillez trouver ci-joint le rapport pour l'intervention du {date_visite}.\n\nCordialement,"
-# Encodage pour les espaces et caractères spéciaux
-mail_link = f"mailto:?subject={urllib.parse.quote(sujet)}&body={urllib.parse.quote(corps)}"
-
-st.markdown(f'<a href="{mail_link}" target="_blank"><button style="width:100%; height:3em; background-color:#0078d4; color:white; border:none; border-radius:5px;">📧 Ouvrir dans Outlook</button></a>', unsafe_allow_html=True)
-
-
-# --- FONCTION GÉNÉRATION WORD ---
+# --- GÉNÉRATION WORD ---
 def generate_word():
     doc = Document()
+    doc.add_heading(f"RAPPORT : {st.session_state.client_name.upper()}", 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
     
-    # 1. Récupération sécurisée des variables
-    nom_client = st.session_state.get('client_name', 'Client Inconnu').upper()
-    nom_tech = st.session_state.get('technicien', 'Non renseigné')
-    visite_date = str(st.session_state.get('date_visite', ''))
-    lieu = st.session_state.get('adresse', 'Non renseignée')
-    
-    # 2. Titre Principal
-    title = doc.add_heading(f"RAPPORT : {nom_client}", 0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    # 3. En-tête Infos
     p = doc.add_paragraph()
-    p.add_run("Date de la visite : ").bold = True
-    p.add_run(f"{visite_date}\n")
-    p.add_run("Technicien : ").bold = True
-    p.add_run(f"{nom_tech}\n")
-    p.add_run("Adresse : ").bold = True
-    p.add_run(f"{lieu}")
+    p.add_run(f"Date : {date_visite}\nTechnicien : {st.session_state.technicien}\nAdresse : {st.session_state.adresse}")
 
-    # 4. Participants
-    doc.add_heading("Participants", level=1)
-    parts = st.session_state.get('participants', [])
-    if isinstance(parts, list):
-        for part in parts:
-            if isinstance(part, dict):
-                nom_p = part.get('nom', '')
-                soc_p = part.get('societe', '')
-                doc.add_paragraph(f"• {nom_p} ({soc_p})", style='List Bullet')
-
-    # 5. Sections et Photos
     doc.add_heading("Constats et Photos", level=1)
-    sections = st.session_state.get('sections', [])
-    
-    for s in sections:
+    for s in st.session_state.sections:
         doc.add_heading(s.get('titre', 'Sans titre'), level=2)
         doc.add_paragraph(s.get('description', ''))
         
-        if s.get('image') is not None:
-            try:
-                image_bytes = s['image'].getvalue()
-                image_stream = io.BytesIO(image_bytes)
-                doc.add_picture(image_stream, width=Inches(4.0))
-                doc.add_paragraph() 
-            except Exception as e:
-                p_err = doc.add_paragraph()
-                p_err.add_run(f"[Image non insérée : {e}]").italic = True
-
-    # --- ATTENTION : CES LIGNES DOIVENT ÊTRE DÉCALÉES DE 4 ESPACES ---
+        if s.get('photos'):
+            for img_file in s['photos']:
+                try:
+                    img_stream = io.BytesIO(img_file.getvalue())
+                    doc.add_picture(img_stream, width=Inches(4.0))
+                except:
+                    continue
+    
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return buffer 
+    return buffer
 
-# --- SECTION EXPORT FINAL (INTERFACE) ---
-# Ici on revient tout à gauche car on sort de la fonction
-st.divider()
-st.subheader("🏁 Finaliser le Rapport")
-
-col_pdf, col_word = st.columns(2)
-
-with col_pdf:
-    if st.button("📄 Préparer le PDF"):
-        pdf_content = generate_pdf()
-        st.download_button(
-            label="⬇️ Télécharger PDF",
-            data=pdf_content,
-            file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.pdf",
-            mime="application/pdf"
-        )
+# --- EXPORT FINAL ---
+st.header("🏁 Exportation")
+col_word, col_pdf = st.columns(2)
 
 with col_word:
-    if st.button("📝 Préparer le fichier Word"):
-        word_buffer = generate_word() 
-        if word_buffer:
-            word_data = word_buffer.getvalue() 
-            st.download_button(
-                label="⬇️ Cliquer pour télécharger (.docx)",
-                data=word_data,
-                file_name=f"Rapport_{st.session_state.get('client_name', 'Export')}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-    
-# --- BARRE LATÉRALE : SAUVEGARDE ET RESTAURATION LOCALE ---
-
+    if st.button("📝 Générer Word"):
+        word_buf = generate_word()
+        st.download_button(
+            label="⬇️ Télécharger Word",
+            data=word_buf.getvalue(),
+            file_name=f"Rapport_{st.session_state.client_name}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
